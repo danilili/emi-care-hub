@@ -11,37 +11,41 @@ const AgentSchedule = () => {
   const [agentOn, setAgentOn] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
-  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-  const sendWebhook = async (data: Record<string, unknown>) => {
-    setSending(true);
+  const sendWebhook = async (payload: { Estado_Bot: boolean; Hora_Inicio: string; Hora_Fin: string }) => {
+    setStatus("saving");
     try {
       await fetch(WEBHOOK_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
-      toast.success("Configuración enviada correctamente");
+      setStatus("saved");
+      setTimeout(() => setStatus("idle"), 2500);
     } catch {
       toast.error("Error al enviar la configuración");
-    } finally {
-      setSending(false);
+      setStatus("idle");
     }
   };
 
+  const buildPayload = (bot: boolean, inicio: string, fin: string) => ({
+    Estado_Bot: bot,
+    Hora_Inicio: inicio,
+    Hora_Fin: fin,
+  });
+
   const handleToggle = (checked: boolean) => {
     setAgentOn(checked);
-    sendWebhook({ agentActive: checked, startTime, endTime });
+    sendWebhook(buildPayload(checked, startTime, endTime));
   };
 
   const handleTimeChange = (field: "startTime" | "endTime", value: string) => {
+    const newStart = field === "startTime" ? value : startTime;
+    const newEnd = field === "endTime" ? value : endTime;
     if (field === "startTime") setStartTime(value);
     else setEndTime(value);
-    sendWebhook({
-      agentActive: agentOn,
-      startTime: field === "startTime" ? value : startTime,
-      endTime: field === "endTime" ? value : endTime,
-    });
+    sendWebhook(buildPayload(agentOn, newStart, newEnd));
   };
 
   return (
@@ -66,7 +70,7 @@ const AgentSchedule = () => {
               </p>
             </div>
           </div>
-          <Switch checked={agentOn} onCheckedChange={handleToggle} disabled={sending} />
+          <Switch checked={agentOn} onCheckedChange={handleToggle} disabled={status === "saving"} />
         </div>
 
         {/* Time selectors */}
@@ -80,7 +84,7 @@ const AgentSchedule = () => {
               type="time"
               value={startTime}
               onChange={(e) => handleTimeChange("startTime", e.target.value)}
-              disabled={sending}
+              disabled={status === "saving"}
               className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -93,11 +97,25 @@ const AgentSchedule = () => {
               type="time"
               value={endTime}
               onChange={(e) => handleTimeChange("endTime", e.target.value)}
-              disabled={sending}
+              disabled={status === "saving"}
               className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
         </div>
+
+        {/* Status indicator */}
+        {status !== "idle" && (
+          <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+            status === "saving"
+              ? "bg-muted text-muted-foreground"
+              : "bg-success/10 text-success"
+          }`}>
+            <span className={`inline-block h-2 w-2 rounded-full ${
+              status === "saving" ? "animate-pulse bg-muted-foreground" : "bg-success"
+            }`} />
+            {status === "saving" ? "Guardando..." : "Configuración Actualizada"}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
