@@ -7,7 +7,7 @@
   "background_color": "#ffffff",
   "theme_color": "#1e40af",
   "orientation": "portrait-primary",
- "icons": [
+  "icons": [
     {
       "src": "https://vite-pwa-org.netlify.app/pwa-192x192.png",
       "sizes": "192x192",
@@ -20,6 +20,5 @@
       "type": "image/png",
       "purpose": "any"
     }
-  ]
   ]
 }
