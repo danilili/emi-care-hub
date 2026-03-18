@@ -18,20 +18,29 @@ export type Database = {
         Row: {
           bot_encendido: boolean | null
           fecha_regreso_emergencia: string | null
+          horario_fin: string | null
+          horario_inicio: string | null
           id_instancia: string
           modo_emergencia: boolean | null
+          trabaja_24_7: boolean | null
         }
         Insert: {
           bot_encendido?: boolean | null
           fecha_regreso_emergencia?: string | null
+          horario_fin?: string | null
+          horario_inicio?: string | null
           id_instancia: string
           modo_emergencia?: boolean | null
+          trabaja_24_7?: boolean | null
         }
         Update: {
           bot_encendido?: boolean | null
           fecha_regreso_emergencia?: string | null
+          horario_fin?: string | null
+          horario_inicio?: string | null
           id_instancia?: string
           modo_emergencia?: boolean | null
+          trabaja_24_7?: boolean | null
         }
         Relationships: []
       }
