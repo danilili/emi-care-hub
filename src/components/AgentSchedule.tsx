@@ -1,52 +1,88 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Clock, Power } from "lucide-react";
+import { Clock, Power, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
-const WEBHOOK_URL = "https://YOUR_N8N_WEBHOOK_URL/agent-schedule";
+const INSTANCIA = "Reyes";
 
 const AgentSchedule = () => {
   const [agentOn, setAgentOn] = useState(true);
+  const [allDay, setAllDay] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [loading, setLoading] = useState(true);
 
-  const sendWebhook = async (payload: { Estado_Bot: boolean; Hora_Inicio: string; Hora_Fin: string }) => {
-    setStatus("saving");
-    try {
-      await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      setStatus("saved");
-      setTimeout(() => setStatus("idle"), 2500);
-    } catch {
-      toast.error("Error al enviar la configuración");
-      setStatus("idle");
+  // Load initial state
+  useEffect(() => {
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("Configuracion_Clinica")
+        .select("bot_encendido, trabaja_24_7, horario_inicio, horario_fin")
+        .eq("id_instancia", INSTANCIA)
+        .single();
+
+      if (error) {
+        toast.error("Error al cargar configuración");
+        setLoading(false);
+        return;
+      }
+
+      if (data) {
+        setAgentOn(data.bot_encendido ?? true);
+        setAllDay(data.trabaja_24_7 ?? false);
+        setStartTime((data.horario_inicio ?? "09:00:00").slice(0, 5));
+        setEndTime((data.horario_fin ?? "18:00:00").slice(0, 5));
+      }
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  const updateField = async (fields: Record<string, unknown>) => {
+    const { error } = await supabase
+      .from("Configuracion_Clinica")
+      .update(fields)
+      .eq("id_instancia", INSTANCIA);
+
+    if (error) {
+      toast.error("Error al guardar");
+    } else {
+      toast.success("Guardado", { duration: 1500 });
     }
   };
 
-  const buildPayload = (bot: boolean, inicio: string, fin: string) => ({
-    Estado_Bot: bot,
-    Hora_Inicio: inicio,
-    Hora_Fin: fin,
-  });
-
-  const handleToggle = (checked: boolean) => {
+  const handleToggleAgent = (checked: boolean) => {
     setAgentOn(checked);
-    sendWebhook(buildPayload(checked, startTime, endTime));
+    updateField({ bot_encendido: checked });
+  };
+
+  const handleToggleAllDay = (checked: boolean) => {
+    setAllDay(checked);
+    updateField({ trabaja_24_7: checked });
   };
 
   const handleTimeChange = (field: "startTime" | "endTime", value: string) => {
-    const newStart = field === "startTime" ? value : startTime;
-    const newEnd = field === "endTime" ? value : endTime;
-    if (field === "startTime") setStartTime(value);
-    else setEndTime(value);
-    sendWebhook(buildPayload(agentOn, newStart, newEnd));
+    if (field === "startTime") {
+      setStartTime(value);
+      updateField({ horario_inicio: value });
+    } else {
+      setEndTime(value);
+      updateField({ horario_fin: value });
+    }
   };
+
+  if (loading) {
+    return (
+      <Card className="card-shadow">
+        <CardContent className="flex items-center justify-center py-12">
+          <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="card-shadow hover:card-shadow-hover transition-shadow duration-300">
@@ -56,8 +92,8 @@ const AgentSchedule = () => {
           Horario del Agente
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Toggle */}
+      <CardContent className="space-y-5">
+        {/* Agent toggle */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
           <div className="flex items-center gap-3">
             <div className={`flex h-9 w-9 items-center justify-center rounded-full ${agentOn ? "gradient-primary" : "bg-muted"} transition-colors`}>
@@ -70,7 +106,23 @@ const AgentSchedule = () => {
               </p>
             </div>
           </div>
-          <Switch checked={agentOn} onCheckedChange={handleToggle} disabled={status === "saving"} />
+          <Switch checked={agentOn} onCheckedChange={handleToggleAgent} />
+        </div>
+
+        {/* 24/7 toggle */}
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-9 w-9 items-center justify-center rounded-full ${allDay ? "gradient-primary" : "bg-muted"} transition-colors`}>
+              <RefreshCw className={`h-4 w-4 ${allDay ? "text-primary-foreground" : "text-muted-foreground"}`} />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Trabajar 24/7</Label>
+              <p className={`text-xs font-medium ${allDay ? "text-success" : "text-muted-foreground"}`}>
+                {allDay ? "Activo" : "Inactivo"}
+              </p>
+            </div>
+          </div>
+          <Switch checked={allDay} onCheckedChange={handleToggleAllDay} />
         </div>
 
         {/* Time selectors */}
@@ -84,8 +136,8 @@ const AgentSchedule = () => {
               type="time"
               value={startTime}
               onChange={(e) => handleTimeChange("startTime", e.target.value)}
-              disabled={status === "saving"}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={allDay}
+              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <div className="space-y-2">
@@ -97,25 +149,11 @@ const AgentSchedule = () => {
               type="time"
               value={endTime}
               onChange={(e) => handleTimeChange("endTime", e.target.value)}
-              disabled={status === "saving"}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={allDay}
+              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         </div>
-
-        {/* Status indicator */}
-        {status !== "idle" && (
-          <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
-            status === "saving"
-              ? "bg-muted text-muted-foreground"
-              : "bg-success/10 text-success"
-          }`}>
-            <span className={`inline-block h-2 w-2 rounded-full ${
-              status === "saving" ? "animate-pulse bg-muted-foreground" : "bg-success"
-            }`} />
-            {status === "saving" ? "Guardando..." : "Configuración Actualizada"}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
