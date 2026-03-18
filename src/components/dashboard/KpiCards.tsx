@@ -9,7 +9,8 @@ interface KpiCardsProps {
 const KpiCards = ({ data }: KpiCardsProps) => {
   const totalTareas = data.reduce((sum, r) => sum + (r.total_tareas_ia ?? 0), 0);
   const totalMinutos = data.reduce((sum, r) => sum + (r.minutos_ahorrados ?? 0), 0);
-  const horasAhorradas = Math.round(totalMinutos / 60);
+  const horas = Math.floor(totalMinutos / 60);
+  const minutos = Math.round(totalMinutos % 60);
   const ingresoRecuperado = data.reduce((sum, r) => sum + (r.dinero_gestionado ?? 0), 0);
 
   const kpis = [
