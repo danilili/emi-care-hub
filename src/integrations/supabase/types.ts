@@ -49,6 +49,16 @@ export type Database = {
       }
     }
     Views: {
+      vista_resumen_diario: {
+        Row: {
+          dinero_gestionado: number | null
+          fecha: string | null
+          id_instancia: string | null
+          minutos_ahorrados: number | null
+          total_tareas_ia: number | null
+        }
+        Relationships: []
+      }
       vista_resumen_mensual: {
         Row: {
           dinero_gestionado: number | null
