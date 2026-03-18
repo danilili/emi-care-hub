@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      Configuracion_Clinica: {
+        Row: {
+          bot_encendido: boolean | null
+          fecha_regreso_emergencia: string | null
+          id_instancia: string
+          modo_emergencia: boolean | null
+        }
+        Insert: {
+          bot_encendido?: boolean | null
+          fecha_regreso_emergencia?: string | null
+          id_instancia: string
+          modo_emergencia?: boolean | null
+        }
+        Update: {
+          bot_encendido?: boolean | null
+          fecha_regreso_emergencia?: string | null
+          id_instancia?: string
+          modo_emergencia?: boolean | null
+        }
+        Relationships: []
+      }
       Metricas_Globales: {
         Row: {
           accion: string | null
