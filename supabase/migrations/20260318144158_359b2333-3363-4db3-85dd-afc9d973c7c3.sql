@@ -1,0 +1,1 @@
+CREATE POLICY "Allow anon SELECT" ON public."Metricas_Globales" FOR SELECT TO anon USING (true);
