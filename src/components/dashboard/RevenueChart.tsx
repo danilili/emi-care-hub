@@ -9,17 +9,17 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
-import type { ResumenMensual } from "@/hooks/useResumenMensual";
+import { parseISO, format } from "date-fns";
+import { es } from "date-fns/locale";
+import type { ResumenDiario } from "@/hooks/useResumenDiario";
 
 interface RevenueChartProps {
-  data: ResumenMensual[];
+  data: ResumenDiario[];
 }
 
-const formatMonth = (mes: string | null) => {
-  if (!mes) return "";
-  const [year, month] = mes.split("-");
-  const date = new Date(Number(year), Number(month) - 1);
-  return date.toLocaleDateString("es-MX", { month: "short", year: "2-digit" });
+const formatDate = (fecha: string | null) => {
+  if (!fecha) return "";
+  return format(parseISO(fecha), "dd MMM", { locale: es });
 };
 
 const formatCurrency = (value: number) =>
@@ -46,7 +46,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 const RevenueChart = ({ data }: RevenueChartProps) => {
   const chartData = data.map((r) => ({
-    mes: formatMonth(r.mes),
+    fecha: formatDate(r.fecha),
     dinero: r.dinero_gestionado ?? 0,
   }));
 
@@ -55,7 +55,7 @@ const RevenueChart = ({ data }: RevenueChartProps) => {
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 font-display text-lg">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Ingreso Gestionado por Mes
+          Ingreso Gestionado por Día
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-2">
@@ -71,8 +71,8 @@ const RevenueChart = ({ data }: RevenueChartProps) => {
                 opacity={0.4}
               />
               <XAxis
-                dataKey="mes"
-                tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                dataKey="fecha"
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />

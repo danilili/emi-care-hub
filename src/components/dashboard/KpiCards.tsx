@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Brain, Clock, DollarSign } from "lucide-react";
-import type { ResumenMensual } from "@/hooks/useResumenMensual";
+import type { ResumenDiario } from "@/hooks/useResumenDiario";
 
 interface KpiCardsProps {
-  data: ResumenMensual[];
+  data: ResumenDiario[];
 }
 
 const KpiCards = ({ data }: KpiCardsProps) => {
@@ -59,7 +59,6 @@ const KpiCards = ({ data }: KpiCardsProps) => {
               </p>
             </div>
           </CardContent>
-          {/* Decorative blur circle */}
           <div
             className={`pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${kpi.gradient} opacity-10 blur-2xl`}
           />
