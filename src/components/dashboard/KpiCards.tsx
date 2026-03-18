@@ -22,7 +22,7 @@ const KpiCards = ({ data }: KpiCardsProps) => {
     },
     {
       label: "Horas Ahorradas",
-      value: `${horasAhorradas.toLocaleString("es-MX")} hrs`,
+      value: `${horas}h ${minutos}m`,
       icon: Clock,
       gradient: "from-success to-success/70",
     },
