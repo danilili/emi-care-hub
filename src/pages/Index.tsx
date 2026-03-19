@@ -8,6 +8,7 @@ import { useResumenDiario } from "@/hooks/useResumenDiario";
 import { useFilteredData } from "@/hooks/useFilteredData";
 import { Brain } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import PwaInstallButton from "@/components/PwaInstallButton";
 
 const Index = () => {
   const { data, isLoading, isError } = useResumenDiario("Reyes");
