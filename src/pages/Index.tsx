@@ -37,14 +37,17 @@ const Index = () => {
               </p>
             </div>
           </div>
-          <DateFilter
-            filter={filter}
-            onFilterChange={setFilter}
-            customFrom={customFrom}
-            customTo={customTo}
-            onCustomFromChange={setCustomFrom}
-            onCustomToChange={setCustomTo}
-          />
+          <div className="flex items-center gap-3">
+            <PwaInstallButton />
+            <DateFilter
+              filter={filter}
+              onFilterChange={setFilter}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFromChange={setCustomFrom}
+              onCustomToChange={setCustomTo}
+            />
+          </div>
         </div>
       </header>
 
@@ -98,7 +101,6 @@ const Index = () => {
           </section>
         </div>
       </main>
-      <PwaInstallButton />
     </div>
   );
 };
