@@ -20,10 +20,11 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   // Load initial state
   useEffect(() => {
     const load = async () => {
+      if (!idInstancia) { setLoading(false); return; }
       const { data, error } = await supabase
         .from("Configuracion_Clinica")
         .select("bot_encendido, trabaja_24_7, horario_inicio, horario_fin")
-        .eq("id_instancia", INSTANCIA)
+        .eq("id_instancia", idInstancia)
         .single();
 
       if (error) {
