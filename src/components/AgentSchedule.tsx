@@ -6,9 +6,11 @@ import { Clock, Power, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const INSTANCIA = "Reyes";
+interface AgentScheduleProps {
+  idInstancia: string;
+}
 
-const AgentSchedule = () => {
+const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   const [agentOn, setAgentOn] = useState(true);
   const [allDay, setAllDay] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
