@@ -1,23 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import AgentSchedule from "@/components/AgentSchedule";
 import EmergencyProtocol from "@/components/EmergencyProtocol";
 import KpiCards from "@/components/dashboard/KpiCards";
 import RevenueChart from "@/components/dashboard/RevenueChart";
 import DateFilter, { type FilterOption } from "@/components/dashboard/DateFilter";
+import { useUserConfig } from "@/hooks/useUserConfig";
 import { useResumenDiario } from "@/hooks/useResumenDiario";
 import { useFilteredData } from "@/hooks/useFilteredData";
-import { Brain } from "lucide-react";
+import UserMenu from "@/components/UserMenu";
+import { Brain, Inbox } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import PwaInstallButton from "@/components/PwaInstallButton";
 
 const Index = () => {
-  const { data, isLoading, isError } = useResumenDiario("Reyes");
+  const navigate = useNavigate();
+
+  // Auth guard
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) navigate("/auth");
+    });
+  }, [navigate]);
+
+  const { data: config, isLoading: configLoading } = useUserConfig();
+  const idInstancia = config?.instancia_evolution ?? "";
+
+  const { data, isLoading, isError } = useResumenDiario(idInstancia);
 
   const [filter, setFilter] = useState<FilterOption>("month");
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();
 
   const filtered = useFilteredData(data ?? [], filter, customFrom, customTo);
+
+  const hasMetrics = filtered.length > 0;
+  const metricsLoading = isLoading || configLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -33,12 +51,11 @@ const Index = () => {
                 Impacto de Emi (IA)
               </h1>
               <p className="text-xs text-muted-foreground">
-                Dashboard de métricas · Consultorio Reyes
+                Dashboard de métricas · {config?.nombre_comercial ?? "Cargando…"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <PwaInstallButton />
             <DateFilter
               filter={filter}
               onFilterChange={setFilter}
@@ -47,6 +64,7 @@ const Index = () => {
               onCustomFromChange={setCustomFrom}
               onCustomToChange={setCustomTo}
             />
+            <UserMenu config={config ?? null} />
           </div>
         </div>
       </header>
@@ -58,7 +76,7 @@ const Index = () => {
           <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Resumen General
           </h2>
-          {isLoading ? (
+          {metricsLoading ? (
             <div className="grid gap-4 sm:grid-cols-3">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-32 rounded-lg" />
@@ -66,24 +84,22 @@ const Index = () => {
             </div>
           ) : isError ? (
             <p className="text-sm text-destructive">Error al cargar datos.</p>
+          ) : !hasMetrics ? (
+            <EmptyState />
           ) : (
             <KpiCards data={filtered} />
           )}
         </section>
 
         {/* Chart */}
-        <section>
-          <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Tendencia del Periodo
-          </h2>
-          {isLoading ? (
-            <Skeleton className="h-[400px] rounded-lg" />
-          ) : isError ? (
-            <p className="text-sm text-destructive">Error al cargar gráfica.</p>
-          ) : (
+        {hasMetrics && !metricsLoading && (
+          <section>
+            <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Tendencia del Periodo
+            </h2>
             <RevenueChart data={filtered} />
-          )}
-        </section>
+          </section>
+        )}
 
         {/* Config & Emergency */}
         <div className="grid gap-6 md:grid-cols-2">
@@ -104,5 +120,17 @@ const Index = () => {
     </div>
   );
 };
+
+const EmptyState = () => (
+  <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-16 px-6 text-center">
+    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+      <Inbox className="h-7 w-7 text-muted-foreground" />
+    </div>
+    <h3 className="font-display text-lg font-semibold text-card-foreground">Sin datos aún</h3>
+    <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+      Cuando Emi empiece a trabajar en tu consultorio, aquí verás el resumen de su impacto.
+    </p>
+  </div>
+);
 
 export default Index;
