@@ -44,6 +44,120 @@ export type Database = {
         }
         Relationships: []
       }
+      configuracion_maestra: {
+        Row: {
+          api_key_whatsapp: string | null
+          created_at: string
+          descripcion_servicios: string | null
+          domicilio_presencial: string | null
+          duracion_sesion: number | null
+          emi_active: boolean | null
+          fecha_inicio: string | null
+          fecha_renovacion: string | null
+          formato_cita: string | null
+          google_calendar_id: string | null
+          google_sheet_id: string | null
+          horarios_json: Json | null
+          id_cliente: string
+          instancia_evolution: string | null
+          link_videollamada: string | null
+          nombre_comercial: string
+          nombre_doctor: string | null
+          perfil_paciente: string | null
+          plan_contratado: string | null
+          prompt_base: string | null
+          protocolo_emergencia: boolean | null
+          referido_por: string | null
+          status_comercial: string | null
+          telefono_consultorio: string | null
+          tiempo_descanso: number | null
+          user_id: string | null
+        }
+        Insert: {
+          api_key_whatsapp?: string | null
+          created_at?: string
+          descripcion_servicios?: string | null
+          domicilio_presencial?: string | null
+          duracion_sesion?: number | null
+          emi_active?: boolean | null
+          fecha_inicio?: string | null
+          fecha_renovacion?: string | null
+          formato_cita?: string | null
+          google_calendar_id?: string | null
+          google_sheet_id?: string | null
+          horarios_json?: Json | null
+          id_cliente?: string
+          instancia_evolution?: string | null
+          link_videollamada?: string | null
+          nombre_comercial: string
+          nombre_doctor?: string | null
+          perfil_paciente?: string | null
+          plan_contratado?: string | null
+          prompt_base?: string | null
+          protocolo_emergencia?: boolean | null
+          referido_por?: string | null
+          status_comercial?: string | null
+          telefono_consultorio?: string | null
+          tiempo_descanso?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          api_key_whatsapp?: string | null
+          created_at?: string
+          descripcion_servicios?: string | null
+          domicilio_presencial?: string | null
+          duracion_sesion?: number | null
+          emi_active?: boolean | null
+          fecha_inicio?: string | null
+          fecha_renovacion?: string | null
+          formato_cita?: string | null
+          google_calendar_id?: string | null
+          google_sheet_id?: string | null
+          horarios_json?: Json | null
+          id_cliente?: string
+          instancia_evolution?: string | null
+          link_videollamada?: string | null
+          nombre_comercial?: string
+          nombre_doctor?: string | null
+          perfil_paciente?: string | null
+          plan_contratado?: string | null
+          prompt_base?: string | null
+          protocolo_emergencia?: boolean | null
+          referido_por?: string | null
+          status_comercial?: string | null
+          telefono_consultorio?: string | null
+          tiempo_descanso?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      Mensajes_Pendientes: {
+        Row: {
+          atendido: boolean | null
+          created_at: string
+          id: number
+          mensaje: string | null
+          nombre: string | null
+          telefono: string | null
+        }
+        Insert: {
+          atendido?: boolean | null
+          created_at?: string
+          id?: number
+          mensaje?: string | null
+          nombre?: string | null
+          telefono?: string | null
+        }
+        Update: {
+          atendido?: boolean | null
+          created_at?: string
+          id?: number
+          mensaje?: string | null
+          nombre?: string | null
+          telefono?: string | null
+        }
+        Relationships: []
+      }
       Metricas_Globales: {
         Row: {
           accion: string | null
