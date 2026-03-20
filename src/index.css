@@ -148,7 +148,6 @@
   .gradient-primary {
     background: var(--gradient-primary);
   }
-  }
   .reveal-section.animate-in {
     opacity: 1;
     transform: translateY(0);
