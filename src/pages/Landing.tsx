@@ -25,6 +25,20 @@ const features = [
 const Landing = () => {
   const navigate = useNavigate();
   const heroRef = useRef<HTMLDivElement>(null);
+
+  const handleLogin = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/auth");
+      return;
+    }
+    const { data } = await supabase
+      .from("configuracion_maestra")
+      .select("id_cliente")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    navigate(data ? "/dashboard" : "/onboarding");
+  };
   const featuresRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
