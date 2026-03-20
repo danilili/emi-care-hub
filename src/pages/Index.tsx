@@ -107,7 +107,7 @@ const Index = () => {
             <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Configuración
             </h2>
-            <AgentSchedule />
+            <AgentSchedule idInstancia={idInstancia} />
           </section>
           <section>
             <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">

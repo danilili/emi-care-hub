@@ -48,7 +48,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
     const { error } = await supabase
       .from("Configuracion_Clinica")
       .update(fields)
-      .eq("id_instancia", INSTANCIA);
+      .eq("id_instancia", idInstancia);
 
     if (error) {
       toast.error("Error al guardar");
