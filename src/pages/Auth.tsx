@@ -16,16 +16,24 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // If already logged in, redirect
+  const redirectByConfig = async (userId: string) => {
+    const { data } = await supabase
+      .from("configuracion_maestra")
+      .select("id_cliente")
+      .eq("user_id", userId)
+      .maybeSingle();
+    navigate(data ? "/dashboard" : "/onboarding");
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
-        navigate("/onboarding");
+        redirectByConfig(session.user.id);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/onboarding");
+      if (session) redirectByConfig(session.user.id);
     });
 
     return () => subscription.unsubscribe();

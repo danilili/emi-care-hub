@@ -157,7 +157,7 @@ const Onboarding = () => {
             <p className="text-muted-foreground">
               En breve recibirás un WhatsApp para activarla.
             </p>
-            <Button onClick={() => navigate("/")} className="mt-4">
+            <Button onClick={() => navigate("/dashboard")} className="mt-4">
               Ir al Dashboard
             </Button>
           </CardContent>
