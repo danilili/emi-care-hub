@@ -6,9 +6,11 @@ import { Clock, Power, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const INSTANCIA = "Reyes";
+interface AgentScheduleProps {
+  idInstancia: string;
+}
 
-const AgentSchedule = () => {
+const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   const [agentOn, setAgentOn] = useState(true);
   const [allDay, setAllDay] = useState(false);
   const [startTime, setStartTime] = useState("09:00");
@@ -18,10 +20,11 @@ const AgentSchedule = () => {
   // Load initial state
   useEffect(() => {
     const load = async () => {
+      if (!idInstancia) { setLoading(false); return; }
       const { data, error } = await supabase
         .from("Configuracion_Clinica")
         .select("bot_encendido, trabaja_24_7, horario_inicio, horario_fin")
-        .eq("id_instancia", INSTANCIA)
+        .eq("id_instancia", idInstancia)
         .single();
 
       if (error) {
@@ -39,13 +42,13 @@ const AgentSchedule = () => {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [idInstancia]);
 
   const updateField = async (fields: Record<string, unknown>) => {
     const { error } = await supabase
       .from("Configuracion_Clinica")
       .update(fields)
-      .eq("id_instancia", INSTANCIA);
+      .eq("id_instancia", idInstancia);
 
     if (error) {
       toast.error("Error al guardar");
