@@ -69,7 +69,7 @@ const Landing = () => {
             </div>
             <span className="font-display text-lg font-bold text-card-foreground">Emi</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/auth")}>
+          <Button variant="ghost" size="sm" onClick={handleLogin}>
             Iniciar sesión
           </Button>
         </div>
