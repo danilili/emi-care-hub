@@ -42,7 +42,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [idInstancia]);
 
   const updateField = async (fields: Record<string, unknown>) => {
     const { error } = await supabase
