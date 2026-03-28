@@ -8,9 +8,7 @@ const isLovablePreview = window.location.hostname.includes("preview--");
 async function resetPreviewPwaCache() {
   if (!isLovablePreview) return true;
 
-  const registrations = "serviceWorker" in navigator
-    ? await navigator.serviceWorker.getRegistrations()
-    : [];
+  const registrations = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistrations() : [];
 
   await Promise.all(registrations.map((registration) => registration.unregister()));
 
@@ -31,7 +29,7 @@ async function resetPreviewPwaCache() {
 }
 
 async function registerServiceWorker() {
-  if ("serviceWorker" in navigator && !isLovablePreview) {
+  if ("serviceWorker" in navigator) {
     try {
       await navigator.serviceWorker.register("/sw.js");
     } catch (e) {
