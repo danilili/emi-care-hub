@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      cola_mensajes: {
+        Row: {
+          created_at: string | null
+          id: number
+          mensaje_texto: string | null
+          n8n_execution_id: string | null
+          whatsapp_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: never
+          mensaje_texto?: string | null
+          n8n_execution_id?: string | null
+          whatsapp_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: never
+          mensaje_texto?: string | null
+          n8n_execution_id?: string | null
+          whatsapp_id?: string
+        }
+        Relationships: []
+      }
       Configuracion_Clinica: {
         Row: {
           bot_encendido: boolean | null
@@ -48,6 +72,7 @@ export type Database = {
         Row: {
           api_key_whatsapp: string | null
           created_at: string
+          datos_fiscales: Json | null
           descripcion_servicios: string | null
           domicilio_presencial: string | null
           duracion_sesion: number | null
@@ -62,20 +87,24 @@ export type Database = {
           instancia_evolution: string | null
           link_videollamada: string | null
           nombre_comercial: string
+          nombre_contacto: string
           nombre_doctor: string | null
           perfil_paciente: string | null
           plan_contratado: string | null
           prompt_base: string | null
           protocolo_emergencia: boolean | null
           referido_por: string | null
-          status_comercial: string | null
           telefono_consultorio: string | null
+          telefono_contacto: string
+          telefono_emergencia: string | null
           tiempo_descanso: number | null
+          timezone: string
           user_id: string | null
         }
         Insert: {
           api_key_whatsapp?: string | null
           created_at?: string
+          datos_fiscales?: Json | null
           descripcion_servicios?: string | null
           domicilio_presencial?: string | null
           duracion_sesion?: number | null
@@ -90,20 +119,24 @@ export type Database = {
           instancia_evolution?: string | null
           link_videollamada?: string | null
           nombre_comercial: string
+          nombre_contacto?: string
           nombre_doctor?: string | null
           perfil_paciente?: string | null
           plan_contratado?: string | null
           prompt_base?: string | null
           protocolo_emergencia?: boolean | null
           referido_por?: string | null
-          status_comercial?: string | null
           telefono_consultorio?: string | null
+          telefono_contacto?: string
+          telefono_emergencia?: string | null
           tiempo_descanso?: number | null
+          timezone?: string
           user_id?: string | null
         }
         Update: {
           api_key_whatsapp?: string | null
           created_at?: string
+          datos_fiscales?: Json | null
           descripcion_servicios?: string | null
           domicilio_presencial?: string | null
           duracion_sesion?: number | null
@@ -118,15 +151,18 @@ export type Database = {
           instancia_evolution?: string | null
           link_videollamada?: string | null
           nombre_comercial?: string
+          nombre_contacto?: string
           nombre_doctor?: string | null
           perfil_paciente?: string | null
           plan_contratado?: string | null
           prompt_base?: string | null
           protocolo_emergencia?: boolean | null
           referido_por?: string | null
-          status_comercial?: string | null
           telefono_consultorio?: string | null
+          telefono_contacto?: string
+          telefono_emergencia?: string | null
           tiempo_descanso?: number | null
+          timezone?: string
           user_id?: string | null
         }
         Relationships: []

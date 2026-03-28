@@ -16,11 +16,12 @@ export function useResumenDiario(idInstancia: string) {
       const { data, error } = await supabase
         .from("vista_resumen_diario")
         .select("*")
-        .eq("id_instancia", idInstancia)
+        .ilike("id_instancia", idInstancia)
         .order("fecha", { ascending: true });
 
       if (error) throw error;
       return (data ?? []) as ResumenDiario[];
     },
+    enabled: !!idInstancia,
   });
 }
