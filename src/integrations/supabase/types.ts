@@ -94,6 +94,7 @@ export type Database = {
           prompt_base: string | null
           protocolo_emergencia: boolean | null
           referido_por: string | null
+          status_comercial: string | null
           telefono_consultorio: string | null
           telefono_contacto: string
           telefono_emergencia: string | null
@@ -126,6 +127,7 @@ export type Database = {
           prompt_base?: string | null
           protocolo_emergencia?: boolean | null
           referido_por?: string | null
+          status_comercial?: string | null
           telefono_consultorio?: string | null
           telefono_contacto?: string
           telefono_emergencia?: string | null
@@ -158,6 +160,7 @@ export type Database = {
           prompt_base?: string | null
           protocolo_emergencia?: boolean | null
           referido_por?: string | null
+          status_comercial?: string | null
           telefono_consultorio?: string | null
           telefono_contacto?: string
           telefono_emergencia?: string | null
