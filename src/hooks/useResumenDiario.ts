@@ -22,5 +22,6 @@ export function useResumenDiario(idInstancia: string) {
       if (error) throw error;
       return (data ?? []) as ResumenDiario[];
     },
+    enabled: !!idInstancia,
   });
 }
