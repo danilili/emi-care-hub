@@ -1,26 +1,11 @@
-const CACHE_VERSION = "v2";
-
-// Force activate immediately, replacing old SW
-self.addEventListener("install", function (event) {
+self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
-self.addEventListener("activate", function (event) {
-  // Clear all old caches
-  event.waitUntil(
-    caches.keys().then(function (names) {
-      return Promise.all(
-        names.map(function (name) {
-          return caches.delete(name);
-        })
-      );
-    }).then(function () {
-      return self.clients.claim();
-    })
-  );
+self.addEventListener("activate", (event) => {
+  event.waitUntil(clients.claim());
 });
 
-// Network-first: always fetch from network, never serve stale cache
-self.addEventListener("fetch", function (event) {
+self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(event.request));
 });
