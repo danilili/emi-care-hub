@@ -42,8 +42,9 @@ async function bootstrap() {
   const shouldRender = await resetPreviewPwaCache();
   if (!shouldRender) return;
 
-  createRoot(document.getElementById("root")!).render(<App />);
+  // Register SW early so Lighthouse detects it
   registerServiceWorker();
+  createRoot(document.getElementById("root")!).render(<App />);
 }
 
 void bootstrap();
