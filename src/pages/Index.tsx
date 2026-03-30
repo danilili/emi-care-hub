@@ -122,6 +122,8 @@ const Index = () => {
           </section>
         </div>
       </main>
+
+      <PwaInstallBanner />
     </div>
   );
 };
