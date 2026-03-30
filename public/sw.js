@@ -1,3 +1,5 @@
+const CACHE_NAME = "emi-cache-v1";
+
 self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
@@ -5,13 +7,34 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((names) =>
-      Promise.all(names.map((n) => caches.delete(n)))
+      Promise.all(
+        names
+          .filter((n) => n !== CACHE_NAME)
+          .map((n) => caches.delete(n))
+      )
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener("fetch", (event) => {
+  const { request } = event;
+
+  // Only cache GET requests
+  if (request.method !== "GET") return;
+
+  // Skip non-http(s) requests
+  if (!request.url.startsWith("http")) return;
+
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(request)
+      .then((response) => {
+        // Cache successful same-origin responses
+        if (response.ok && new URL(request.url).origin === self.location.origin) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request))
   );
 });
