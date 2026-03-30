@@ -41,21 +41,26 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary shadow-sm">
-              <Brain className="h-5 w-5 text-primary-foreground" />
+        <div className="mx-auto max-w-5xl px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl gradient-primary shadow-sm sm:h-10 sm:w-10">
+                <Brain className="h-4 w-4 text-primary-foreground sm:h-5 sm:w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="font-display text-base font-bold text-card-foreground truncate sm:text-xl">
+                  Impacto de Emi (IA)
+                </h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  {config?.nombre_comercial ?? "Cargando…"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-display text-xl font-bold text-card-foreground">
-                Impacto de Emi (IA)
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                Dashboard de métricas · {config?.nombre_comercial ?? "Cargando…"}
-              </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <UserMenu config={config ?? null} />
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="mt-3 flex items-center">
             <DateFilter
               filter={filter}
               onFilterChange={setFilter}
@@ -64,7 +69,6 @@ const Index = () => {
               onCustomFromChange={setCustomFrom}
               onCustomToChange={setCustomTo}
             />
-            <UserMenu config={config ?? null} />
           </div>
         </div>
       </header>
