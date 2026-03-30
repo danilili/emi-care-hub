@@ -12,6 +12,7 @@ import { useFilteredData } from "@/hooks/useFilteredData";
 import UserMenu from "@/components/UserMenu";
 import { Brain, Inbox } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -121,6 +122,8 @@ const Index = () => {
           </section>
         </div>
       </main>
+
+      <PwaInstallBanner />
     </div>
   );
 };
