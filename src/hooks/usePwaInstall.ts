@@ -8,12 +8,19 @@ interface BeforeInstallPromptEvent extends Event {
 export function usePwaInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIos, setIsIos] = useState(false);
 
   useEffect(() => {
-    if (window.matchMedia("(display-mode: standalone)").matches) {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as any).standalone === true;
+
+    if (standalone) {
       setIsInstalled(true);
       return;
     }
+
+    setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent));
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -43,5 +50,9 @@ export function usePwaInstall() {
     return outcome === "accepted";
   };
 
-  return { canInstall: !!deferredPrompt && !isInstalled, install };
+  return {
+    canInstall: !!deferredPrompt && !isInstalled,
+    isIos: isIos && !isInstalled,
+    install,
+  };
 }
