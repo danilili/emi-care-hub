@@ -1,13 +1,22 @@
-import { X, Download } from "lucide-react";
+import { X, Download, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { useState } from "react";
 
 const PwaInstallBanner = () => {
-  const { canInstall, install } = usePwaInstall();
-  const [dismissed, setDismissed] = useState(false);
+  const { canInstall, isIos, install } = usePwaInstall();
+  const [dismissed, setDismissed] = useState(() =>
+    localStorage.getItem("emi-pwa-dismissed") === "1"
+  );
 
-  if (!canInstall || dismissed) return null;
+  const showBanner = !dismissed && (canInstall || isIos);
+
+  if (!showBanner) return null;
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    localStorage.setItem("emi-pwa-dismissed", "1");
+  };
 
   const handleInstall = async () => {
     await install();
@@ -21,18 +30,24 @@ const PwaInstallBanner = () => {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-card-foreground">Instalar Emi App</p>
-          <p className="text-xs text-muted-foreground truncate">Acceso rápido desde tu pantalla</p>
+          <p className="text-xs text-muted-foreground leading-snug">
+            {isIos
+              ? <>Toca <Share className="inline h-3.5 w-3.5 -mt-0.5" /> y luego "Añadir a inicio"</>
+              : "Acceso rápido desde tu pantalla"}
+          </p>
         </div>
-        <Button
-          size="sm"
-          onClick={handleInstall}
-          className="shrink-0 gap-1.5 rounded-xl gradient-primary text-primary-foreground"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Instalar
-        </Button>
+        {canInstall && (
+          <Button
+            size="sm"
+            onClick={handleInstall}
+            className="shrink-0 gap-1.5 rounded-xl gradient-primary text-primary-foreground"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Instalar
+          </Button>
+        )}
         <button
-          onClick={() => setDismissed(true)}
+          onClick={handleDismiss}
           className="shrink-0 rounded-full p-1 text-muted-foreground hover:bg-muted/50"
           aria-label="Cerrar"
         >
