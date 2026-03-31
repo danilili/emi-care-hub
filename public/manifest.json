@@ -6,13 +6,9 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#1e40af",
-  "prefer_related_applications": false,
-  "related_applications": [],
-  "iarc_rating_id": "",
   "icons": [
     {
       "src": "/icons/app-icon-192.png",
@@ -41,11 +37,18 @@
   ],
   "screenshots": [
     {
-      "src": "/screenshots/screenshot-desktop.jpg",
+      "src": "/screenshots/screenshot-desktop.png",
       "sizes": "1280x800",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "wide",
       "label": "Panel de control Emi"
+    },
+    {
+      "src": "/screenshots/screenshot-mobile.png",
+      "sizes": "389x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Panel de control Emi en móvil"
     }
   ],
   "categories": ["health", "medical", "productivity"]
