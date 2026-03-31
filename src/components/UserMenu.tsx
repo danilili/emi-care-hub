@@ -63,13 +63,13 @@ const UserMenu = ({ config }: UserMenuProps) => {
               <p className="text-xs text-muted-foreground">{config?.nombre_comercial}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setAccountDialogOpen(true)}>
+            <DropdownMenuItem onClick={() => setTimeout(() => setAccountDialogOpen(true), 0)}>
               <Settings className="mr-2 h-4 w-4" />
               Configuración de cuenta
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onClick={() => setCancelDialogOpen(true)}
+              onClick={() => setTimeout(() => setCancelDialogOpen(true), 0)}
             >
               <XCircle className="mr-2 h-4 w-4" />
               Cancelar suscripción

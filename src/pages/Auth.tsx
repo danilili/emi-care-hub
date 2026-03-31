@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Brain, ArrowLeft, Loader2 } from "lucide-react";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(false);
+  const location = useLocation();
+  const [isLogin, setIsLogin] = useState((location.state as any)?.mode === "login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);

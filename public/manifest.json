@@ -18,28 +18,14 @@
       "src": "/icons/app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/app-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
-  "categories": ["health", "medical", "productivity"],
-  "screenshots": [
-    {
-      "src": "/icons/app-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "wide"
-    },
-    {
-      "src": "/icons/app-icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "form_factor": "narrow"
-    }
-  ]
+  "categories": ["health", "medical", "productivity"]
 }
