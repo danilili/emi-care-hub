@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const WEBHOOK_URL =
-  "https://reservalia.app.n8n.cloud/webhook-test/eb22d1c8-1805-47d1-b83e-490375e0f7db";
+  "https://reservalia.app.n8n.cloud/webhook/eb22d1c8-1805-47d1-b83e-490375e0f7db";
 
 const EmergencyProtocol = () => {
   const [motivo, setMotivo] = useState("");
