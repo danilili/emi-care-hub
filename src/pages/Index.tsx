@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import AgentSchedule from "@/components/AgentSchedule";
 import EmergencyProtocol from "@/components/EmergencyProtocol";
@@ -10,9 +10,38 @@ import { useUserConfig } from "@/hooks/useUserConfig";
 import { useResumenDiario } from "@/hooks/useResumenDiario";
 import { useFilteredData } from "@/hooks/useFilteredData";
 import UserMenu from "@/components/UserMenu";
-import { Brain, Inbox } from "lucide-react";
+import { Brain, Inbox, LayoutDashboard, ClipboardList } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import PwaInstallBanner from "@/components/PwaInstallBanner";
+
+function NavTabs() {
+  const location = useLocation();
+  const tabs = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/asistencias", label: "Asistencias", icon: ClipboardList },
+  ];
+  return (
+    <nav className="flex gap-1">
+      {tabs.map(({ to, label, icon: Icon }) => {
+        const active = location.pathname === to;
+        return (
+          <Link
+            key={to}
+            to={to}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              active
+                ? "gradient-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 const Index = () => {
   const navigate = useNavigate();
@@ -61,7 +90,8 @@ const Index = () => {
               <UserMenu config={config ?? null} />
             </div>
           </div>
-          <div className="mt-3 flex items-center">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <NavTabs />
             <DateFilter
               filter={filter}
               onFilterChange={setFilter}
