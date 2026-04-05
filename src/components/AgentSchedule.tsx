@@ -25,7 +25,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
         .from("Configuracion_Clinica")
         .select("bot_encendido, trabaja_24_7, horario_inicio, horario_fin")
         .eq("id_instancia", idInstancia)
-        .single();
+        .maybeSingle();
 
       if (error) {
         toast.error("Error al cargar configuración");
