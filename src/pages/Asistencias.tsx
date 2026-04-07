@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Brain, ClipboardList, LayoutDashboard, Inbox, CheckCircle2, Loader2 } from "lucide-react";
+import { Brain, Inbox, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserConfig } from "@/hooks/useUserConfig";
 import { useCitasPendientes, type Cita } from "@/hooks/useCitasPendientes";
 import UserMenu from "@/components/UserMenu";
+import { NavTabs } from "@/components/NavTabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,8 +53,8 @@ function ModalidadBadge({ modalidad }: { modalidad: string | null }) {
       variant="outline"
       className={
         isVideo
-          ? "border-violet-500/40 bg-violet-500/10 text-violet-400"
-          : "border-sky-500/40 bg-sky-500/10 text-sky-400"
+          ? "border-purple-400/40 bg-purple-400/10 text-purple-400"
+          : "border-orange-400/40 bg-orange-400/10 text-orange-400"
       }
     >
       {modalidad ?? "Presencial"}
@@ -71,37 +72,6 @@ function StatusBadge({ status }: { status: string }) {
     <Badge variant="outline" className={map[status] ?? map["Agendado"]}>
       {status}
     </Badge>
-  );
-}
-
-// ── Nav tabs (shared pattern) ──────────────────────────────────────────────────
-
-function NavTabs() {
-  const location = useLocation();
-  const tabs = [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/asistencias", label: "Asistencias", icon: ClipboardList },
-  ];
-  return (
-    <nav className="mt-3 flex gap-1">
-      {tabs.map(({ to, label, icon: Icon }) => {
-        const active = location.pathname === to;
-        return (
-          <Link
-            key={to}
-            to={to}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              active
-                ? "gradient-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
-          </Link>
-        );
-      })}
-    </nav>
   );
 }
 
