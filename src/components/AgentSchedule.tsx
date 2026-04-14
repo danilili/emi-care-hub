@@ -12,7 +12,7 @@ interface AgentScheduleProps {
 
 const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   const [agentOn, setAgentOn] = useState(true);
-  const [allDay, setAllDay] = useState(false);
+  const [allDay, setAllDay] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
   const [loading, setLoading] = useState(true);
@@ -35,7 +35,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
 
       if (data) {
         setAgentOn(data.bot_encendido ?? true);
-        setAllDay(data.trabaja_24_7 ?? false);
+        setAllDay(data.trabaja_24_7 ?? true);
         setStartTime((data.horario_inicio ?? "09:00:00").slice(0, 5));
         setEndTime((data.horario_fin ?? "18:00:00").slice(0, 5));
       }
