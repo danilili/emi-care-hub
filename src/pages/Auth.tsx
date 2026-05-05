@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveAuthRedirect } from "@/integrations/supabase/authRedirect";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,28 +18,29 @@ const Auth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const redirectByConfig = async (userId: string) => {
-    const { data } = await supabase
-      .from("configuracion_maestra")
-      .select("id_cliente")
-      .eq("user_id", userId)
-      .maybeSingle();
-    navigate(data ? "/dashboard" : "/onboarding");
-  };
-
   useEffect(() => {
+    const handleSession = async (userId: string, userEmail: string | undefined) => {
+      if (!userEmail) return;
+      try {
+        const dest = await resolveAuthRedirect(userId, userEmail);
+        navigate(`/${dest}`);
+      } catch (err: any) {
+        toast({ title: "Error al cargar tu cuenta", description: err.message, variant: "destructive" });
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
-        redirectByConfig(session.user.id);
+        handleSession(session.user.id, session.user.email);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) redirectByConfig(session.user.id);
+      if (session) handleSession(session.user.id, session.user.email);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveAuthRedirect } from "@/integrations/supabase/authRedirect";
 import { Button } from "@/components/ui/button";
 import { Brain, ArrowRight, Clock, MessageSquare, CalendarCheck } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -32,14 +33,35 @@ const Landing = () => {
       navigate("/auth", { state: { mode: "login" } });
       return;
     }
-    const { data } = await supabase
-      .from("configuracion_maestra")
-      .select("id_cliente")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-    navigate(data ? "/dashboard" : "/onboarding");
+    if (!session.user.email) return;
+    const dest = await resolveAuthRedirect(session.user.id, session.user.email);
+    navigate(`/${dest}`);
   };
   const featuresRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const redirectIfAuthenticated = async (userId: string, userEmail: string | undefined) => {
+      if (!userEmail) return;
+      try {
+        const dest = await resolveAuthRedirect(userId, userEmail);
+        navigate(`/${dest}`);
+      } catch {
+        // Stay on landing if the helper fails — user can still click "Iniciar sesión".
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) redirectIfAuthenticated(session.user.id, session.user.email);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        redirectIfAuthenticated(session.user.id, session.user.email);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
