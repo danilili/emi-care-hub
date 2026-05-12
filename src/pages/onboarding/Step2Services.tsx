@@ -134,26 +134,16 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
     );
   };
 
-  const validationError = (() => {
-    if (services.length === 0) return "Agrega al menos un servicio.";
-    for (const [sIdx, s] of services.entries()) {
-      if (!s.name.trim()) return `El servicio #${sIdx + 1} necesita un nombre.`;
-      if (s.variants.length === 0)
-        return `"${s.name}" necesita al menos una modalidad.`;
+  const duplicateModalityError = (() => {
+    for (const s of services) {
       const seen = new Set<string>();
       for (const v of s.variants) {
-        if (!v.modality)
-          return `Selecciona la modalidad de cada variante en "${s.name}".`;
+        if (!v.modality) continue;
         if (seen.has(v.modality)) {
           const label = MODALITIES.find((m) => m.value === v.modality)?.label;
-          return `"${s.name}" tiene la modalidad ${label} repetida.`;
+          return `"${s.name || "Servicio sin nombre"}" tiene la modalidad ${label} repetida.`;
         }
         seen.add(v.modality);
-        const price = parseFloat(v.price);
-        if (isNaN(price) || price <= 0)
-          return `Cada variante necesita un precio mayor a 0 (revisa "${s.name}").`;
-        if (!v.duration_minutes || v.duration_minutes <= 0)
-          return `Cada variante necesita una duración mayor a 0 (revisa "${s.name}").`;
       }
     }
     return null;
@@ -161,24 +151,39 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (validationError || saving) return;
+    if (duplicateModalityError || saving) return;
 
     setSaving(true);
     try {
-      const payload = services.map((s) => ({
-        name: s.name.trim(),
-        description: s.description.trim(),
-        variants: s.variants.map((v) => ({
-          modality: v.modality,
-          duration_minutes: v.duration_minutes,
-          price: parseFloat(v.price),
-        })),
-      })) as unknown as Json;
+      const payload = services
+        .map((s) => {
+          const name = s.name.trim();
+          const variants = s.variants
+            .filter((v) => {
+              const price = parseFloat(v.price);
+              return (
+                v.modality &&
+                !isNaN(price) &&
+                price > 0 &&
+                v.duration_minutes &&
+                v.duration_minutes > 0
+              );
+            })
+            .map((v) => ({
+              modality: v.modality,
+              duration_minutes: v.duration_minutes,
+              price: parseFloat(v.price),
+            }));
+          return { name, description: s.description.trim(), variants };
+        })
+        .filter((s) => s.name && s.variants.length > 0);
 
-      const { error } = await supabase.rpc("replace_therapist_services", {
-        p_services: payload,
-      });
-      if (error) throw error;
+      if (payload.length > 0) {
+        const { error } = await supabase.rpc("replace_therapist_services", {
+          p_services: payload as unknown as Json,
+        });
+        if (error) throw error;
+      }
 
       onSaved();
     } catch (err: any) {
@@ -218,7 +223,7 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
             <CardContent className="space-y-4 p-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 space-y-1.5">
-                  <Label htmlFor={`service-name-${sIdx}`}>Nombre del servicio *</Label>
+                  <Label htmlFor={`service-name-${sIdx}`}>Nombre del servicio</Label>
                   <Input
                     id={`service-name-${sIdx}`}
                     placeholder="Terapia individual"
@@ -267,7 +272,7 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
                       className="flex flex-wrap items-end gap-2 rounded-lg border border-border bg-background/50 p-3"
                     >
                       <div className="flex-1 min-w-[140px] space-y-1">
-                        <Label className="text-xs">Modalidad *</Label>
+                        <Label className="text-xs">Modalidad</Label>
                         <Select
                           value={variant.modality || undefined}
                           onValueChange={(value) =>
@@ -305,12 +310,11 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
                         />
                       </div>
                       <div className="w-28 space-y-1">
-                        <Label className="text-xs">Precio (MXN) *</Label>
+                        <Label className="text-xs">Precio (MXN)</Label>
                         <Input
                           type="number"
                           min={0}
                           step={50}
-                          placeholder="900"
                           value={variant.price}
                           onChange={(e) => updateVariant(sIdx, vIdx, { price: e.target.value })}
                         />
@@ -350,12 +354,12 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
         <Plus className="mr-1 h-4 w-4" /> Agregar otro servicio
       </Button>
 
-      {validationError && (
-        <p className="text-sm text-destructive">{validationError}</p>
+      {duplicateModalityError && (
+        <p className="text-sm text-destructive">{duplicateModalityError}</p>
       )}
 
       <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={Boolean(validationError) || saving}>
+        <Button type="submit" disabled={Boolean(duplicateModalityError) || saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Guardar y continuar <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
