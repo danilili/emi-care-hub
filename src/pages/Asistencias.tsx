@@ -257,27 +257,41 @@ const Asistencias = () => {
 
       if (dbError) throw dbError;
 
-      // 2. POST al webhook de n8n
-      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_ASISTENCIAS;
-      if (webhookUrl && !webhookUrl.startsWith("PLACEHOLDER")) {
-        const payload = {
-          id_cita: cita.id,
-          id_cita_externo: cita.id_cita_externo,
-          telefono: cita.telefono,
-          nombre_paciente: cita.nombre_paciente,
-          apellidos_paciente: cita.apellidos_paciente,
-          fecha: cita.fecha,
-          asistencia: row.asistencia,
-          pago: row.asistencia === "Presente" ? row.pago : null,
-          monto_adeudo: row.pago === "Adeudo" ? Number(row.monto_adeudo) : 0,
-          id_cliente: cita.id_cliente,
-        };
-        await fetch(webhookUrl, {
+      // 2. POSTs a los webhooks de n8n (mismo payload en todos)
+      const payload = {
+        id_cita: cita.id,
+        id_cita_externo: cita.id_cita_externo,
+        telefono: cita.telefono,
+        nombre_paciente: cita.nombre_paciente,
+        apellidos_paciente: cita.apellidos_paciente,
+        fecha: cita.fecha,
+        asistencia: row.asistencia,
+        pago: row.asistencia === "Presente" ? row.pago : null,
+        monto_adeudo: row.pago === "Adeudo" ? Number(row.monto_adeudo) : 0,
+        id_cliente: cita.id_cliente,
+      };
+
+      const postWebhook = (url: string | undefined) => {
+        if (!url || url.startsWith("PLACEHOLDER")) return null;
+        return fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-      }
+      };
+
+      const posts = [
+        // Respaldo a Bitácora (Bridge App Bitacora) — se conserva durante la transición
+        postWebhook(import.meta.env.VITE_N8N_WEBHOOK_ASISTENCIAS),
+        // POST #1: asistencia event-driven (siempre, Presente o Falta)
+        postWebhook(import.meta.env.VITE_N8N_WEBHOOK_ASISTENCIA),
+        // POST #2: cobranza, solo con pago confirmado
+        row.asistencia === "Presente" && row.pago
+          ? postWebhook(import.meta.env.VITE_N8N_WEBHOOK_COBRANZA)
+          : null,
+      ].filter(Boolean) as Promise<Response>[];
+
+      await Promise.all(posts);
 
       toast.success(`Asistencia de ${cita.nombre_paciente} confirmada`);
       updateRow(cita.id, { sending: false, confirmed: true });
