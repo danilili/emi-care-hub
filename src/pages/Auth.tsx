@@ -9,14 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Brain, ArrowLeft, Loader2 } from "lucide-react";
 
+type Mode = "login" | "signup" | "reset";
+
 const Auth = () => {
   const location = useLocation();
-  const [isLogin, setIsLogin] = useState((location.state as any)?.mode === "login");
+  const [mode, setMode] = useState<Mode>((location.state as any)?.mode === "login" ? "login" : "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const isLogin = mode === "login";
+  const isReset = mode === "reset";
 
   useEffect(() => {
     const handleSession = async (userId: string, userEmail: string | undefined) => {
@@ -47,17 +52,38 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (isReset) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (error) throw error;
+        toast({
+          title: "Revisa tu correo",
+          description: "Si existe una cuenta con ese correo, te enviamos un enlace para restablecer tu contraseña.",
+        });
+        setMode("login");
+      } else if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         // onAuthStateChange will handle redirect
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: `${window.location.origin}/onboarding` },
         });
         if (error) throw error;
+        // Con "Confirm email" activado, Supabase no devuelve error para un email ya
+        // registrado (anti-enumeración): regresa un user con identities vacío.
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          toast({
+            title: "Ese correo ya tiene cuenta",
+            description: "Inicia sesión o usa “¿Olvidaste tu contraseña?” para recuperarla.",
+            variant: "destructive",
+          });
+          setMode("login");
+          return;
+        }
         toast({
           title: "¡Cuenta creada!",
           description: "Revisa tu correo para confirmar tu cuenta, o continúa si la confirmación está desactivada.",
@@ -92,10 +118,14 @@ const Auth = () => {
             className="mb-1 font-display text-xl font-bold text-card-foreground text-center"
             style={{ lineHeight: "1.15" }}
           >
-            {isLogin ? "Bienvenido de vuelta" : "Crea tu cuenta"}
+            {isReset ? "Recupera tu contraseña" : isLogin ? "Bienvenido de vuelta" : "Crea tu cuenta"}
           </h2>
           <p className="mb-6 text-center text-sm text-muted-foreground">
-            {isLogin ? "Ingresa tus credenciales para continuar" : "Regístrate para configurar tu asistente"}
+            {isReset
+              ? "Te enviaremos un enlace para crear una nueva contraseña"
+              : isLogin
+                ? "Ingresa tus credenciales para continuar"
+                : "Regístrate para configurar tu asistente"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -110,34 +140,59 @@ const Auth = () => {
                 required
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-            </div>
+            {!isReset && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Contraseña</Label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => setMode("reset")}
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  )}
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+            )}
             <Button type="submit" className="w-full active:scale-[0.97] transition-transform" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? "Iniciar sesión" : "Registrarme"}
+              {isReset ? "Enviar enlace" : isLogin ? "Iniciar sesión" : "Registrarme"}
             </Button>
           </form>
 
-          <p className="mt-5 text-center text-sm text-muted-foreground">
-            {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              onClick={() => setIsLogin(!isLogin)}
-            >
-              {isLogin ? "Regístrate" : "Inicia sesión"}
-            </button>
-          </p>
+          {isReset ? (
+            <p className="mt-5 text-center text-sm text-muted-foreground">
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => setMode("login")}
+              >
+                Volver a iniciar sesión
+              </button>
+            </p>
+          ) : (
+            <p className="mt-5 text-center text-sm text-muted-foreground">
+              {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                onClick={() => setMode(isLogin ? "signup" : "login")}
+              >
+                {isLogin ? "Regístrate" : "Inicia sesión"}
+              </button>
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

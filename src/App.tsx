@@ -10,6 +10,7 @@ import Asistencias from "./pages/Asistencias";
 import Agenda from "./pages/Agenda";
 import Pagos from "./pages/Pagos";
 import Onboarding from "./pages/Onboarding";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/dashboard" element={<Index />} />
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/asistencias" element={<Asistencias />} />
