@@ -10,7 +10,14 @@ interface AgentScheduleProps {
   idInstancia: string;
 }
 
+// Detección de stack: si el usuario logueado tiene tenant en `therapists` (por email),
+// el switch opera el V2 (`therapist_config.bot_enabled`); si no —caso Reyes hasta su
+// cutover— opera el V1 (`Configuracion_Clinica.bot_encendido`) como siempre.
+type StackMode = "v1" | "v2";
+
 const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
+  const [mode, setMode] = useState<StackMode>("v1");
+  const [therapistId, setTherapistId] = useState<string | null>(null);
   const [agentOn, setAgentOn] = useState(true);
   const [allDay, setAllDay] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
@@ -20,6 +27,37 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   // Load initial state
   useEffect(() => {
     const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // ¿Tenant V2? (en el modelo V2, therapists.id === auth.uid(); RLS solo permite ver la fila propia)
+      if (user?.id) {
+        const { data: therapist } = await supabase
+          .from("therapists")
+          .select("id")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (therapist?.id) {
+          const { data: cfg, error } = await supabase
+            .from("therapist_config")
+            .select("bot_enabled, works_24_7")
+            .eq("therapist_id", therapist.id)
+            .maybeSingle();
+
+          if (error) {
+            toast.error("Error al cargar configuración");
+          } else if (cfg) {
+            setMode("v2");
+            setTherapistId(therapist.id);
+            setAgentOn(cfg.bot_enabled ?? true);
+            setAllDay(cfg.works_24_7 ?? true);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fallback V1 (Reyes, hasta el cutover)
       if (!idInstancia) { setLoading(false); return; }
       const { data, error } = await supabase
         .from("Configuracion_Clinica")
@@ -44,36 +82,55 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
     load();
   }, [idInstancia]);
 
-  const updateField = async (fields: Record<string, unknown>) => {
-    const { error } = await supabase
-      .from("Configuracion_Clinica")
-      .update(fields)
-      .eq("id_instancia", idInstancia);
+  // Un solo punto de escritura; verifica filas afectadas para no reportar
+  // "Guardado" cuando el UPDATE no tocó nada (bug histórico del toast mentiroso).
+  const updateField = async (v1Fields: Record<string, unknown>, v2Fields: Record<string, unknown>) => {
+    if (mode === "v2" && therapistId) {
+      const { data, error } = await supabase
+        .from("therapist_config")
+        .update({ ...v2Fields, updated_at: new Date().toISOString() })
+        .eq("therapist_id", therapistId)
+        .select("therapist_id");
 
-    if (error) {
-      toast.error("Error al guardar");
+      if (error || !data?.length) {
+        toast.error("Error al guardar");
+        return false;
+      }
     } else {
-      toast.success("Guardado", { duration: 1500 });
+      const { data, error } = await supabase
+        .from("Configuracion_Clinica")
+        .update(v1Fields)
+        .eq("id_instancia", idInstancia)
+        .select("id_instancia");
+
+      if (error || !data?.length) {
+        toast.error("Error al guardar");
+        return false;
+      }
     }
+    toast.success("Guardado", { duration: 1500 });
+    return true;
   };
 
-  const handleToggleAgent = (checked: boolean) => {
+  const handleToggleAgent = async (checked: boolean) => {
     setAgentOn(checked);
-    updateField({ bot_encendido: checked });
+    const ok = await updateField({ bot_encendido: checked }, { bot_enabled: checked });
+    if (!ok) setAgentOn(!checked);
   };
 
-  const handleToggleAllDay = (checked: boolean) => {
+  const handleToggleAllDay = async (checked: boolean) => {
     setAllDay(checked);
-    updateField({ trabaja_24_7: checked });
+    const ok = await updateField({ trabaja_24_7: checked }, { works_24_7: checked });
+    if (!ok) setAllDay(!checked);
   };
 
   const handleTimeChange = (field: "startTime" | "endTime", value: string) => {
     if (field === "startTime") {
       setStartTime(value);
-      updateField({ horario_inicio: value });
+      updateField({ horario_inicio: value }, {});
     } else {
       setEndTime(value);
-      updateField({ horario_fin: value });
+      updateField({ horario_fin: value }, {});
     }
   };
 
@@ -128,35 +185,43 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
           <Switch checked={allDay} onCheckedChange={handleToggleAllDay} />
         </div>
 
-        {/* Time selectors */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="start" className="text-xs font-medium text-muted-foreground">
-              Inicio de jornada
-            </Label>
-            <input
-              id="start"
-              type="time"
-              value={startTime}
-              onChange={(e) => handleTimeChange("startTime", e.target.value)}
-              disabled={allDay}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            />
+        {/* Time selectors — solo stack V1; en V2 los horarios viven en therapist_schedules (por día) */}
+        {mode === "v1" ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="start" className="text-xs font-medium text-muted-foreground">
+                Inicio de jornada
+              </Label>
+              <input
+                id="start"
+                type="time"
+                value={startTime}
+                onChange={(e) => handleTimeChange("startTime", e.target.value)}
+                disabled={allDay}
+                className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end" className="text-xs font-medium text-muted-foreground">
+                Fin de jornada
+              </Label>
+              <input
+                id="end"
+                type="time"
+                value={endTime}
+                onChange={(e) => handleTimeChange("endTime", e.target.value)}
+                disabled={allDay}
+                className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="end" className="text-xs font-medium text-muted-foreground">
-              Fin de jornada
-            </Label>
-            <input
-              id="end"
-              type="time"
-              value={endTime}
-              onChange={(e) => handleTimeChange("endTime", e.target.value)}
-              disabled={allDay}
-              className="w-full rounded-lg border border-input bg-card px-3 py-2.5 text-sm font-medium text-card-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
-        </div>
+        ) : (
+          !allDay && (
+            <p className="text-xs text-muted-foreground">
+              Tus horarios por día se configuran en tu perfil; Emi los respeta automáticamente.
+            </p>
+          )
+        )}
       </CardContent>
     </Card>
   );
