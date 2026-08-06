@@ -90,7 +90,7 @@ const Agenda = () => {
   }, [navigate]);
 
   const { data: config } = useUserConfig();
-  const { data: citas, isLoading, isError } = useCitasHoy(config?.id_cliente);
+  const { data: citas, isLoading, isError } = useCitasHoy(config);
 
   const fechaHoy = format(new Date(), "EEEE d 'de' MMMM", { locale: es });
 

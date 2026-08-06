@@ -28,7 +28,7 @@ const Index = () => {
   const { data: config, isLoading: configLoading } = useUserConfig();
   const idInstancia = config?.instancia_evolution ?? "";
 
-  const { data, isLoading, isError } = useResumenDiario(idInstancia);
+  const { data, isLoading, isError } = useResumenDiario(config);
 
   const [filter, setFilter] = useState<FilterOption>("month");
   const [customFrom, setCustomFrom] = useState<Date | undefined>();

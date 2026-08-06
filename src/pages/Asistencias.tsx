@@ -215,9 +215,8 @@ const Asistencias = () => {
   }, [navigate]);
 
   const { data: config } = useUserConfig();
-  const idCliente = config?.id_cliente;
 
-  const { data: citas, isLoading, isError } = useCitasPendientes(idCliente);
+  const { data: citas, isLoading, isError } = useCitasPendientes(config);
 
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
 
@@ -243,7 +242,33 @@ const Asistencias = () => {
     updateRow(cita.id, { sending: true });
 
     try {
-      // 1. Actualizar en Supabase
+      if (config?.stack === "v2") {
+        // V2: RPC atómica — marca asistencia en appointments y, si hay adeudo,
+        // incrementa balance_due del paciente (el Cobrador V2 lee ese saldo).
+        // Los webhooks de abajo son del stack V1; en V2 no aplican.
+        const PAGO_V2: Record<string, string> = {
+          Efectivo: "cash",
+          Transferencia: "transfer",
+          Adeudo: "debt",
+        };
+        const { error: rpcError } = await (supabase as any).rpc("mark_attendance_v2", {
+          p_appointment_id: cita.id,
+          p_attendance: row.asistencia === "Presente" ? "attended" : "no_show",
+          p_payment_type: row.asistencia === "Presente" ? PAGO_V2[row.pago] ?? null : null,
+          p_debt_amount: row.pago === "Adeudo" ? Number(row.monto_adeudo) : 0,
+        });
+
+        if (rpcError) throw rpcError;
+
+        toast.success(`Asistencia de ${cita.nombre_paciente} confirmada`);
+        updateRow(cita.id, { sending: false, confirmed: true });
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["citas-pendientes"] });
+        }, 1200);
+        return;
+      }
+
+      // 1. Actualizar en Supabase (stack V1 — Reyes hasta el cutover)
       const updateData: Record<string, unknown> = {
         asistencia: row.asistencia,
         pago: row.asistencia === "Presente" ? row.pago : null,
