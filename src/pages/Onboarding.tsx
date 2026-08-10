@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   CreditCard,
   FileText,
+  LogOut,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -99,9 +100,25 @@ const Onboarding = () => {
       <header className="border-b border-border bg-card/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
           <h1 className="font-display text-lg font-bold text-card-foreground">Configurar tu cuenta</h1>
-          <span className="text-sm text-muted-foreground">
-            Paso {step + 1} de {STEPS.length}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground">
+              Paso {step + 1} de {STEPS.length}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground"
+              onClick={async () => {
+                // El avance del wizard ya está guardado en Supabase; salir es seguro
+                // y permite entrar con otra cuenta (antes no había forma de salir).
+                await supabase.auth.signOut();
+                navigate("/auth");
+              }}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Cerrar sesión</span>
+            </Button>
+          </div>
         </div>
         <div className="mx-auto flex max-w-3xl items-center gap-0 overflow-x-auto px-6 pb-5">
           {STEPS.map((s, i) => {
