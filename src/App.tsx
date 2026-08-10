@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Asistencias from "./pages/Asistencias";
 import Agenda from "./pages/Agenda";
 import Pagos from "./pages/Pagos";
+import Ajustes from "./pages/Ajustes";
 import Onboarding from "./pages/Onboarding";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/asistencias" element={<Asistencias />} />
           <Route path="/pagos" element={<Pagos />} />
+          <Route path="/ajustes" element={<Ajustes />} />
           <Route path="/onboarding" element={<Onboarding />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, CalendarDays, Receipt } from "lucide-react";
+import { LayoutDashboard, ClipboardList, CalendarDays, Receipt, Settings } from "lucide-react";
 
 const tabs = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/agenda", label: "Agenda", icon: CalendarDays },
   { to: "/asistencias", label: "Asistencias", icon: ClipboardList },
   { to: "/pagos", label: "Pagos", icon: Receipt },
+  { to: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 
 export function NavTabs() {

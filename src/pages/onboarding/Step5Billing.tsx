@@ -49,13 +49,19 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
   const [payments, setPayments] = useState<PaymentDraft[]>([]);
   const [wantsFiscal, setWantsFiscal] = useState(false);
   const [fiscalUploaded, setFiscalUploaded] = useState(false);
+  // Cuenta bancaria (columnas nuevas de therapist_config; Emi la comparte para transferencias)
+  const [bankName, setBankName] = useState("");
+  const [bankClabe, setBankClabe] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [bankAccountHolder, setBankAccountHolder] = useState("");
 
   useEffect(() => {
     const load = async () => {
       const [configRes, docRes] = await Promise.all([
-        supabase
+        // (supabase as any): los tipos generados aún no incluyen las columnas bancarias
+        (supabase as any)
           .from("therapist_config")
-          .select("payment_methods")
+          .select("payment_methods, bank_name, bank_clabe, bank_account_number, bank_account_holder")
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
         supabase
@@ -74,6 +80,11 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
 
       const methods = (configRes.data?.payment_methods as unknown as PaymentDraft[] | null) ?? [];
       setPayments(methods.length > 0 ? methods : [newPayment()]);
+
+      setBankName(configRes.data?.bank_name ?? "");
+      setBankClabe(configRes.data?.bank_clabe ?? "");
+      setBankAccountNumber(configRes.data?.bank_account_number ?? "");
+      setBankAccountHolder(configRes.data?.bank_account_holder ?? "");
 
       const hasFiscalDoc = Boolean(docRes.data);
       setFiscalUploaded(hasFiscalDoc);
@@ -110,6 +121,9 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
         return `Falta la descripción en el método ${idx + 1}.`;
       }
     }
+    if (bankClabe.length > 0 && !/^\d{18}$/.test(bankClabe)) {
+      return "La CLABE de tu cuenta bancaria debe tener 18 dígitos numéricos.";
+    }
     if (wantsFiscal && !fiscalUploaded) {
       return "Sube tu constancia de situación fiscal o desactiva la opción de facturar.";
     }
@@ -137,10 +151,15 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
         }
       });
 
-      const { error } = await supabase
+      // (supabase as any): los tipos generados aún no incluyen las columnas bancarias
+      const { error } = await (supabase as any)
         .from("therapist_config")
         .update({
           payment_methods: cleanPayments as unknown as Json,
+          bank_name: bankName.trim() || null,
+          bank_clabe: bankClabe || null,
+          bank_account_number: bankAccountNumber.trim() || null,
+          bank_account_holder: bankAccountHolder.trim() || null,
         })
         .eq("therapist_id", therapist.id);
 
@@ -275,6 +294,58 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
           <Button type="button" variant="outline" onClick={addPayment} className="w-full">
             <Plus className="mr-1 h-4 w-4" /> Agregar método de cobro
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Cuenta bancaria
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Emi comparte estos datos a tus pacientes cuando piden pagar por transferencia.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-name">Banco</Label>
+              <Input
+                id="bank-name"
+                placeholder="BBVA, Santander, etc."
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-clabe">CLABE</Label>
+              <Input
+                id="bank-clabe"
+                placeholder="18 dígitos"
+                inputMode="numeric"
+                value={bankClabe}
+                onChange={(e) => setBankClabe(e.target.value.replace(/\D/g, "").slice(0, 18))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-account">Número de cuenta</Label>
+              <Input
+                id="bank-account"
+                placeholder="Opcional"
+                value={bankAccountNumber}
+                onChange={(e) => setBankAccountNumber(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-holder">Titular</Label>
+              <Input
+                id="bank-holder"
+                placeholder="Nombre del titular de la cuenta"
+                value={bankAccountHolder}
+                onChange={(e) => setBankAccountHolder(e.target.value)}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
