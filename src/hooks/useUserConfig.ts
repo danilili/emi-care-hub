@@ -26,6 +26,17 @@ export function useUserConfig() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No authenticated user");
 
+      // Coexistencia legacy/V2 (misma regla que resolveAuthRedirect): mientras exista fila en
+      // configuracion_maestra el usuario opera el stack viejo, aunque ya tenga tenant V2 creado
+      // (Reyes tiene ambos durante la migración; el cutover es borrar/retirar su fila legacy).
+      const { data: legacy } = await supabase
+        .from("configuracion_maestra")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (legacy) return { ...legacy, stack: "v1" } as UserConfig;
+
       // ¿Tenant V2? (en el modelo V2, therapists.id === auth.uid(); RLS solo deja ver la fila propia)
       const { data: therapist } = await supabase
         .from("therapists")
@@ -58,15 +69,7 @@ export function useUserConfig() {
         } as UserConfig;
       }
 
-      // Fallback V1 (Reyes, hasta el cutover)
-      const { data, error } = await supabase
-        .from("configuracion_maestra")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data ? ({ ...data, stack: "v1" } as UserConfig) : null;
+      return null;
     },
   });
 }
