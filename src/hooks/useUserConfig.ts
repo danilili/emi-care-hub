@@ -35,7 +35,13 @@ export function useUserConfig() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (legacy) return { ...legacy, stack: "v1" } as UserConfig;
+      // Preview V2: con fila legacy presente, `localStorage.setItem('emi_stack_override','v2')`
+      // fuerza el dashboard V2 solo en este navegador (para revisar el tenant antes del cutover).
+      const forceV2 =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem("emi_stack_override") === "v2";
+
+      if (legacy && !forceV2) return { ...legacy, stack: "v1" } as UserConfig;
 
       // ¿Tenant V2? (en el modelo V2, therapists.id === auth.uid(); RLS solo deja ver la fila propia)
       const { data: therapist } = await supabase
