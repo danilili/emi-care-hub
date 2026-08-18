@@ -116,6 +116,9 @@ interface CitaCardProps {
 function CitaCard({ cita, row, pagoOptions, onChange, onConfirm }: CitaCardProps) {
   const esPresente = row.asistencia === "Presente";
   const esAdeudo = row.pago === "Adeudo";
+  // Cortesía acepta monto libre (descuentos, intercambios, tarifas especiales);
+  // con monto 0 se comporta como cortesía clásica (sin comprobante).
+  const esCortesia = row.pago === "Cortesía";
 
   const canConfirm =
     !row.sending &&
@@ -185,10 +188,12 @@ function CitaCard({ cita, row, pagoOptions, onChange, onConfirm }: CitaCardProps
             </div>
           )}
 
-          {/* Monto adeudo (solo si Adeudo) */}
-          {esPresente && esAdeudo && (
+          {/* Monto (Adeudo: lo que quedó a deber · Cortesía: lo que se cobró, libre) */}
+          {esPresente && (esAdeudo || esCortesia) && (
             <div className="flex flex-col gap-1 w-[110px]">
-              <label className="text-xs font-medium text-muted-foreground">Monto adeudo</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {esAdeudo ? "Monto adeudo" : "Monto cobrado"}
+              </label>
               <Input
                 type="number"
                 min="0"
@@ -308,6 +313,8 @@ const Asistencias = () => {
         // amistoso en ventana 10:00–18:30 si quedó a deber. Cortesía/Falta: sin mensaje.
         const esPresente = row.asistencia === "Presente";
         const esAdeudo = row.pago === "Adeudo";
+        const esCortesia = row.pago === "Cortesía";
+        const montoLibre = Number(row.monto_adeudo) || 0;
         const svc = row.pago.startsWith("svc:")
           ? (servicios ?? []).find((s) => `svc:${s.id}` === row.pago)
           : null;
@@ -318,17 +325,29 @@ const Asistencias = () => {
           p_appointment_id: cita.id,
           p_attendance: esPresente ? "attended" : "no_show",
           p_payment_type: null,
-          p_debt_amount: esAdeudo ? Number(row.monto_adeudo) : 0,
+          p_debt_amount: esAdeudo ? montoLibre : 0,
           p_payment_label: esPresente ? label : null,
-          p_amount: svc && variant ? Number(variant.price) : null,
+          p_amount:
+            svc && variant
+              ? Number(variant.price)
+              : esCortesia && montoLibre > 0
+                ? montoLibre
+                : null,
           p_variant_id: variant?.id ?? null,
         });
 
         if (rpcError) throw rpcError;
 
         // Proactividad (mismo espíritu que V1): recibo inmediato o cobro programado.
+        // Cortesía con monto > 0 también manda comprobante; con monto 0 queda en silencio.
         const webhookCobranza = import.meta.env.VITE_N8N_WEBHOOK_COBRANZA_V2;
-        const tipo = svc ? "receipt" : esAdeudo ? "debt" : null;
+        const tipo = svc
+          ? "receipt"
+          : esAdeudo
+            ? "debt"
+            : esCortesia && montoLibre > 0
+              ? "receipt"
+              : null;
         if (esPresente && tipo && webhookCobranza && !webhookCobranza.startsWith("PLACEHOLDER")) {
           fetch(webhookCobranza, {
             method: "POST",
@@ -340,8 +359,8 @@ const Asistencias = () => {
               telefono: cita.telefono,
               nombre_paciente: cita.nombre_paciente,
               fecha: cita.fecha,
-              concepto: svc?.name ?? "Adeudo",
-              monto: svc && variant ? Number(variant.price) : Number(row.monto_adeudo) || 0,
+              concepto: svc?.name ?? (esAdeudo ? "Adeudo" : "Cortesía"),
+              monto: svc && variant ? Number(variant.price) : montoLibre,
             }),
           }).catch(() => {
             // La asistencia ya quedó guardada; el mensaje se puede reenviar a mano.
