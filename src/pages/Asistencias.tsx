@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -75,16 +75,45 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ── Opciones de pago ──────────────────────────────────────────────────────────
+
+export interface PagoOption {
+  value: string; // "svc:<service_id>" | "Adeudo" | "Cortesía"
+  label: string;
+}
+
+// V1 (Reyes hasta el cutover): catálogo fijo legacy
+const PAGO_OPTIONS_V1: PagoOption[] = [
+  { value: "Consulta Individual", label: "Consulta Individual" },
+  { value: "Consulta Pareja", label: "Consulta Pareja" },
+  { value: "Adeudo", label: "Adeudo" },
+  { value: "Cortesía", label: "Cortesía" },
+];
+
+interface ServicioV2 {
+  id: string;
+  name: string;
+  variants: { id: string; modality: string; price: number; active: boolean }[];
+}
+
+// Variante que corresponde a la modalidad de la cita (fallback: primera activa)
+function variantForCita(svc: ServicioV2, modalidad: string | null) {
+  const target = modalidad === "Videollamada" ? "virtual" : "in_person";
+  const activas = svc.variants.filter((v) => v.active);
+  return activas.find((v) => v.modality === target) ?? activas[0] ?? null;
+}
+
 // ── Cita card ─────────────────────────────────────────────────────────────────
 
 interface CitaCardProps {
   cita: Cita;
   row: RowState;
+  pagoOptions: PagoOption[];
   onChange: (updates: Partial<RowState>) => void;
   onConfirm: () => void;
 }
 
-function CitaCard({ cita, row, onChange, onConfirm }: CitaCardProps) {
+function CitaCard({ cita, row, pagoOptions, onChange, onConfirm }: CitaCardProps) {
   const esPresente = row.asistencia === "Presente";
   const esAdeudo = row.pago === "Adeudo";
 
@@ -146,10 +175,11 @@ function CitaCard({ cita, row, onChange, onConfirm }: CitaCardProps) {
                   <SelectValue placeholder="Tipo de pago…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Consulta Individual">Consulta Individual</SelectItem>
-                  <SelectItem value="Consulta Pareja">Consulta Pareja</SelectItem>
-                  <SelectItem value="Adeudo">Adeudo</SelectItem>
-                  <SelectItem value="Cortesía">Cortesía</SelectItem>
+                  {pagoOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -218,6 +248,36 @@ const Asistencias = () => {
 
   const { data: citas, isLoading, isError } = useCitasPendientes(config);
 
+  // V2: servicios del terapeuta para el dropdown de pago
+  const { data: servicios } = useQuery({
+    queryKey: ["servicios-pago-v2", config?.id_cliente],
+    enabled: config?.stack === "v2" && !!config?.id_cliente,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("therapist_services")
+        .select("id, name, active, variants:service_variants(id, modality, price, active)")
+        .eq("therapist_id", config!.id_cliente)
+        .eq("active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as ServicioV2[];
+    },
+  });
+
+  const pagoOptionsFor = (cita: Cita): PagoOption[] => {
+    if (config?.stack !== "v2") return PAGO_OPTIONS_V1;
+    const svcOptions: PagoOption[] = (servicios ?? []).map((s) => {
+      const v = variantForCita(s, cita.modalidad);
+      const precio = v ? ` — $${Number(v.price).toLocaleString("es-MX")}` : "";
+      return { value: `svc:${s.id}`, label: `${s.name}${precio}` };
+    });
+    return [
+      ...svcOptions,
+      { value: "Adeudo", label: "Adeudo" },
+      { value: "Cortesía", label: "Cortesía" },
+    ];
+  };
+
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
 
   const getRow = (id: string): RowState => rowStates[id] ?? defaultRow();
@@ -243,22 +303,50 @@ const Asistencias = () => {
 
     try {
       if (config?.stack === "v2") {
-        // V2: RPC atómica — marca asistencia en appointments y, si hay adeudo,
-        // incrementa balance_due del paciente (el Cobrador V2 lee ese saldo).
-        // Los webhooks de abajo son del stack V1; en V2 no aplican.
-        const PAGO_V2: Record<string, string> = {
-          Efectivo: "cash",
-          Transferencia: "transfer",
-          Adeudo: "debt",
-        };
+        // V2: RPC atómica (asistencia + concepto + monto + balance_due + contadores)
+        // y después el POST de proactividad a n8n: recibo si pagó, recordatorio
+        // amistoso en ventana 10:00–18:30 si quedó a deber. Cortesía/Falta: sin mensaje.
+        const esPresente = row.asistencia === "Presente";
+        const esAdeudo = row.pago === "Adeudo";
+        const svc = row.pago.startsWith("svc:")
+          ? (servicios ?? []).find((s) => `svc:${s.id}` === row.pago)
+          : null;
+        const variant = svc ? variantForCita(svc, cita.modalidad) : null;
+        const label = svc ? svc.name : row.pago || null;
+
         const { error: rpcError } = await (supabase as any).rpc("mark_attendance_v2", {
           p_appointment_id: cita.id,
-          p_attendance: row.asistencia === "Presente" ? "attended" : "no_show",
-          p_payment_type: row.asistencia === "Presente" ? PAGO_V2[row.pago] ?? null : null,
-          p_debt_amount: row.pago === "Adeudo" ? Number(row.monto_adeudo) : 0,
+          p_attendance: esPresente ? "attended" : "no_show",
+          p_payment_type: null,
+          p_debt_amount: esAdeudo ? Number(row.monto_adeudo) : 0,
+          p_payment_label: esPresente ? label : null,
+          p_amount: svc && variant ? Number(variant.price) : null,
+          p_variant_id: variant?.id ?? null,
         });
 
         if (rpcError) throw rpcError;
+
+        // Proactividad (mismo espíritu que V1): recibo inmediato o cobro programado.
+        const webhookCobranza = import.meta.env.VITE_N8N_WEBHOOK_COBRANZA_V2;
+        const tipo = svc ? "receipt" : esAdeudo ? "debt" : null;
+        if (esPresente && tipo && webhookCobranza && !webhookCobranza.startsWith("PLACEHOLDER")) {
+          fetch(webhookCobranza, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              therapist_id: config.id_cliente,
+              appointment_id: cita.id,
+              tipo,
+              telefono: cita.telefono,
+              nombre_paciente: cita.nombre_paciente,
+              fecha: cita.fecha,
+              concepto: svc?.name ?? "Adeudo",
+              monto: svc && variant ? Number(variant.price) : Number(row.monto_adeudo) || 0,
+            }),
+          }).catch(() => {
+            // La asistencia ya quedó guardada; el mensaje se puede reenviar a mano.
+          });
+        }
 
         toast.success(`Asistencia de ${cita.nombre_paciente} confirmada`);
         updateRow(cita.id, { sending: false, confirmed: true });
@@ -396,6 +484,7 @@ const Asistencias = () => {
                 key={cita.id}
                 cita={cita}
                 row={getRow(cita.id)}
+                pagoOptions={pagoOptionsFor(cita)}
                 onChange={(updates) => updateRow(cita.id, updates)}
                 onConfirm={() => handleConfirm(cita)}
               />
