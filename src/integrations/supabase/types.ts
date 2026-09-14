@@ -644,6 +644,7 @@ export type Database = {
           id: string
           office_address: string | null
           payment_methods: Json | null
+          reminders_enabled: boolean
           therapist_id: string
           timezone: string
           updated_at: string
@@ -668,6 +669,7 @@ export type Database = {
           id?: string
           office_address?: string | null
           payment_methods?: Json | null
+          reminders_enabled?: boolean
           therapist_id: string
           timezone?: string
           updated_at?: string
@@ -692,6 +694,7 @@ export type Database = {
           id?: string
           office_address?: string | null
           payment_methods?: Json | null
+          reminders_enabled?: boolean
           therapist_id?: string
           timezone?: string
           updated_at?: string

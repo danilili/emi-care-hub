@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Clock, Power, RefreshCw } from "lucide-react";
+import { BellRing, Clock, Power, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,6 +19,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   const [mode, setMode] = useState<StackMode>("v1");
   const [therapistId, setTherapistId] = useState<string | null>(null);
   const [agentOn, setAgentOn] = useState(true);
+  const [remindersOn, setRemindersOn] = useState(true);
   const [allDay, setAllDay] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("18:00");
@@ -40,7 +41,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
         if (therapist?.id) {
           const { data: cfg, error } = await supabase
             .from("therapist_config")
-            .select("bot_enabled, works_24_7")
+            .select("bot_enabled, reminders_enabled, works_24_7")
             .eq("therapist_id", therapist.id)
             .maybeSingle();
 
@@ -50,6 +51,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
             setMode("v2");
             setTherapistId(therapist.id);
             setAgentOn(cfg.bot_enabled ?? true);
+            setRemindersOn(cfg.reminders_enabled ?? true);
             setAllDay(cfg.works_24_7 ?? true);
           }
           setLoading(false);
@@ -118,6 +120,12 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
     if (!ok) setAgentOn(!checked);
   };
 
+  const handleToggleReminders = async (checked: boolean) => {
+    setRemindersOn(checked);
+    const ok = await updateField({}, { reminders_enabled: checked });
+    if (!ok) setRemindersOn(!checked);
+  };
+
   const handleToggleAllDay = async (checked: boolean) => {
     setAllDay(checked);
     const ok = await updateField({ trabaja_24_7: checked }, { works_24_7: checked });
@@ -168,6 +176,24 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
           </div>
           <Switch checked={agentOn} onCheckedChange={handleToggleAgent} />
         </div>
+
+        {/* Reminders toggle — solo stack V2; independiente del bot: apagar el agente no pausa recordatorios */}
+        {mode === "v2" && (
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-9 w-9 items-center justify-center rounded-full ${remindersOn ? "gradient-primary" : "bg-muted"} transition-colors`}>
+                <BellRing className={`h-4 w-4 ${remindersOn ? "text-primary-foreground" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold">Recordatorios de cita</Label>
+                <p className={`text-xs font-medium ${remindersOn ? "text-success" : "text-muted-foreground"}`}>
+                  {remindersOn ? "Activos" : "Pausados"}
+                </p>
+              </div>
+            </div>
+            <Switch checked={remindersOn} onCheckedChange={handleToggleReminders} />
+          </div>
+        )}
 
         {/* 24/7 toggle */}
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/50 p-4">
