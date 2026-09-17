@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircleReply, RefreshCw, Send } from "lucide-react";
+import { MessageCircleReply, RefreshCw, Send, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -113,6 +113,13 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
     }
   };
 
+  const handleDismiss = async (c: Resumable) => {
+    const { error } = await sb.rpc("dismiss_ignored_messages", { p_ids: c.ignored_ids });
+    if (error) { toast.error("No se pudo descartar"); return; }
+    setItems((arr) => arr.filter((i) => i.phone !== c.phone));
+    toast.success("Descartada", { duration: 1200 });
+  };
+
   const total = items.length;
   const nSel = items.filter((i) => selected[i.phone]).length;
 
@@ -132,7 +139,7 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
           Mensajes de pacientes registrados que Emi no contestó mientras estaba apagada (últimas {HOURS} h).
           Al retomarlos, Emi se disculpa por la demora y responde como si acabaran de llegar.
           Las imágenes (comprobantes) no se pueden retomar: revísalas en tu WhatsApp.
-          Las que dicen “Ya le contestaste tú” o “Conversación tuya” vienen desmarcadas: Emi no se mete donde tú ya estás hablando, salvo que las marques.
+          Si ya le contestaste tú, la conversación desaparece sola de esta lista. Con la ✕ la descartas sin que Emi conteste.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -157,6 +164,9 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
                 {c.luz_replied && <Badge variant="secondary">Ya le contestaste tú</Badge>}
                 {!c.luz_replied && c.luz_thread && <Badge variant="secondary">Conversación tuya</Badge>}
                 <Badge variant="outline">{c.messages[c.messages.length - 1]?.motivo}</Badge>
+                <Button variant="ghost" size="icon" className="ml-auto h-7 w-7" onClick={() => handleDismiss(c)} aria-label="Descartar">
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
               <ul className="space-y-0.5">
                 {c.messages.map((m) => (
