@@ -132,6 +132,7 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
           Mensajes de pacientes registrados que Emi no contestó mientras estaba apagada (últimas {HOURS} h).
           Al retomarlos, Emi se disculpa por la demora y responde como si acabaran de llegar.
           Las imágenes (comprobantes) no se pueden retomar: revísalas en tu WhatsApp.
+          Las que dicen “Ya le contestaste tú” o “Conversación tuya” vienen desmarcadas: Emi no se mete donde tú ya estás hablando, salvo que las marques.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -140,9 +141,11 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
         )}
 
         {items.map((c) => (
-          <label key={c.phone} className="flex gap-3 rounded-lg border border-border bg-muted/40 p-3 cursor-pointer">
+          <div key={c.phone} className={`flex gap-3 rounded-lg border p-3 ${selected[c.phone] ? "border-primary/60 bg-muted/60" : "border-border bg-muted/30"}`}>
+            {/* Solo la casilla cambia la selección: tocar la tarjeta para leerla no debe marcar/desmarcar */}
             <Checkbox
               className="mt-1"
+              aria-label={`Retomar conversación con ${c.patient_name || c.phone}`}
               checked={!!selected[c.phone]}
               onCheckedChange={(v) => setSelected((s) => ({ ...s, [c.phone]: v === true }))}
             />
@@ -157,11 +160,11 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
               </div>
               <ul className="space-y-0.5">
                 {c.messages.map((m) => (
-                  <li key={m.id} className="text-sm text-foreground/90 truncate">“{m.text}”</li>
+                  <li key={m.id} className="text-sm text-foreground/90 whitespace-pre-line break-words">“{m.text.replace(/\/n/g, " / ")}”</li>
                 ))}
               </ul>
             </div>
-          </label>
+          </div>
         ))}
 
         {total > 0 && (
