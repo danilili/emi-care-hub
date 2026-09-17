@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { BellRing, Clock, Power, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import ResumeConversations from "@/components/ResumeConversations";
 
 interface AgentScheduleProps {
   idInstancia: string;
@@ -153,6 +154,7 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
   }
 
   return (
+    <>
     <Card className="card-shadow hover:card-shadow-hover transition-shadow duration-300">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 font-display text-lg">
@@ -172,6 +174,11 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
               <p className={`text-xs font-medium ${agentOn ? "text-success" : "text-muted-foreground"}`}>
                 {agentOn ? "Encendido" : "Apagado"}
               </p>
+              {mode === "v2" && !agentOn && remindersOn && (
+                <p className="text-xs text-muted-foreground">
+                  Apagada, Emi solo contesta a quien le mandó recordatorio (confirmar, mover o cancelar). Para silencio total apaga también los recordatorios.
+                </p>
+              )}
             </div>
           </div>
           <Switch checked={agentOn} onCheckedChange={handleToggleAgent} />
@@ -250,6 +257,10 @@ const AgentSchedule = ({ idInstancia }: AgentScheduleProps) => {
         )}
       </CardContent>
     </Card>
+    {mode === "v2" && therapistId && (
+      <ResumeConversations therapistId={therapistId} agentOn={agentOn} />
+    )}
+    </>
   );
 };
 
