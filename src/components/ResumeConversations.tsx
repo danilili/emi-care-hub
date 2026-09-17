@@ -99,11 +99,11 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
         body: JSON.stringify({ therapist_id: therapistId, phones, hours: HOURS }),
       });
       if (!res.ok) throw new Error(String(res.status));
-      toast.success(`Emi va a retomar ${phones.length} conversación${phones.length === 1 ? "" : "es"}. Toma ~2 min por paciente.`);
+      toast.success(`Emi va a retomar ${phones.length} conversación${phones.length === 1 ? "" : "es"}. Emi contesta de una en una, con 10 minutos entre pacientes para no saturar WhatsApp.`);
       setRunStartedAt(since);
       setLog([]);
       stopPolling();
-      pollRef.current = window.setInterval(() => pollLog(since), 8000);
+      pollRef.current = window.setInterval(() => pollLog(since), 20000);
       // La lista de pendientes se vacía conforme se marcan como reinyectadas
       window.setTimeout(load, 15000);
     } catch {
@@ -137,7 +137,7 @@ const ResumeConversations = ({ therapistId, agentOn }: Props) => {
         </CardTitle>
         <p className="text-xs text-muted-foreground">
           Mensajes de pacientes registrados que Emi no contestó mientras estaba apagada (últimas {HOURS} h).
-          Al retomarlos, Emi se disculpa por la demora y responde como si acabaran de llegar.
+          Al retomarlos, Emi se disculpa por la demora y responde como si acabaran de llegar, de una en una y con 10 minutos entre pacientes.
           Las imágenes (comprobantes) no se pueden retomar: revísalas en tu WhatsApp.
           Si ya le contestaste tú, la conversación desaparece sola de esta lista. Con la ✕ la descartas sin que Emi conteste.
         </p>
