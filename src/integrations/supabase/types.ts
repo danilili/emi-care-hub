@@ -628,6 +628,7 @@ export type Database = {
       }
       therapist_config: {
         Row: {
+          appointment_policies: Json
           booking_rules: Json | null
           bot_enabled: boolean
           calendar_id: string | null
@@ -653,6 +654,7 @@ export type Database = {
           works_24_7: boolean
         }
         Insert: {
+          appointment_policies?: Json
           booking_rules?: Json | null
           bot_enabled?: boolean
           calendar_id?: string | null
@@ -678,6 +680,7 @@ export type Database = {
           works_24_7?: boolean
         }
         Update: {
+          appointment_policies?: Json
           booking_rules?: Json | null
           bot_enabled?: boolean
           calendar_id?: string | null

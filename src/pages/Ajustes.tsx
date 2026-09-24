@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Landmark, Loader2, Search, ShieldCheck, UserX, X } from "lucide-react";
+import { Brain, CalendarCheck, Landmark, Loader2, Search, ShieldCheck, UserX, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserConfig } from "@/hooks/useUserConfig";
@@ -13,6 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import AppointmentPoliciesFields, {
+  normalizePolicies,
+  type AppointmentPolicies,
+  type PolicyKey,
+  type PolicyValue,
+} from "@/components/AppointmentPoliciesFields";
+import type { Json } from "@/integrations/supabase/types";
 
 // Los tipos generados de Supabase aún no incluyen las columnas nuevas de
 // therapist_config/patients; se usa (supabase as any) como en el resto del repo.
@@ -24,6 +31,7 @@ interface AjustesConfig {
   bank_account_holder: string | null;
   only_known_patients: boolean | null;
   exclusion_list_enabled: boolean | null;
+  appointment_policies: Json | null;
 }
 
 interface PatientLite {
@@ -204,6 +212,52 @@ function ScopeCard({ therapistId, config }: { therapistId: string; config: Ajust
   );
 }
 
+// ── Políticas de citas ────────────────────────────────────────────────────────
+
+function PoliciesCard({ therapistId, config }: { therapistId: string; config: AjustesConfig }) {
+  const [policies, setPolicies] = useState<AppointmentPolicies>(
+    normalizePolicies(config.appointment_policies),
+  );
+
+  // Guarda por campo (como ScopeCard): escribe el objeto completo y revierte si falla.
+  const handleChange = async (key: PolicyKey, value: PolicyValue) => {
+    const prev = policies;
+    const next = { ...policies, [key]: value };
+    setPolicies(next);
+
+    const { data, error } = await supabase
+      .from("therapist_config")
+      .update({ appointment_policies: next as unknown as Json, updated_at: new Date().toISOString() })
+      .eq("therapist_id", therapistId)
+      .select("therapist_id");
+
+    if (error || !data?.length) {
+      toast.error("Error al guardar");
+      setPolicies(prev);
+      return;
+    }
+    toast.success("Guardado", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <CalendarCheck className="h-5 w-5 text-primary" />
+          Políticas de citas
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <AppointmentPoliciesFields
+          value={policies}
+          onChange={handleChange}
+          idPrefix="ajustes-policy"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Lista de exclusión ────────────────────────────────────────────────────────
 
 function ExclusionCard() {
@@ -374,7 +428,7 @@ const Ajustes = () => {
       const { data, error } = await (supabase as any)
         .from("therapist_config")
         .select(
-          "bank_name, bank_clabe, bank_account_number, bank_account_holder, only_known_patients, exclusion_list_enabled",
+          "bank_name, bank_clabe, bank_account_number, bank_account_holder, only_known_patients, exclusion_list_enabled, appointment_policies",
         )
         .eq("therapist_id", therapistId)
         .maybeSingle();
@@ -434,6 +488,7 @@ const Ajustes = () => {
           <div className="space-y-5">
             <BankCard therapistId={therapistId} config={ajustes} />
             <ScopeCard therapistId={therapistId} config={ajustes} />
+            <PoliciesCard therapistId={therapistId} config={ajustes} />
             <ExclusionCard />
           </div>
         )}

@@ -7,6 +7,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Pencil, Sparkles } from "lucide-react";
 import confetti from "canvas-confetti";
+import {
+  normalizePolicies,
+  POLICY_FIELDS,
+  POLICY_VALUE_LABEL,
+  type AppointmentPolicies,
+} from "@/components/AppointmentPoliciesFields";
 
 type Therapist = Tables<"therapists">;
 
@@ -45,6 +51,7 @@ interface ConfigSummary {
   max_days_advance: number | null;
   payment_count: number;
   has_fiscal: boolean;
+  appointment_policies: AppointmentPolicies;
 }
 
 interface Step7Props {
@@ -92,7 +99,7 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
           .order("start_time"),
         supabase
           .from("therapist_config")
-          .select("timezone, payment_methods, booking_rules")
+          .select("timezone, payment_methods, booking_rules, appointment_policies")
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
         supabase
@@ -142,6 +149,7 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
         max_days_advance: typeof rules.max_days_advance === "number" ? rules.max_days_advance : null,
         payment_count: payments.length,
         has_fiscal: (docsRes.data ?? []).some((d) => d.document_type === "fiscal_certificate"),
+        appointment_policies: normalizePolicies(cfg?.appointment_policies),
       });
 
       setDocuments(
@@ -273,6 +281,11 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
             {config.max_days_advance !== null && (
               <li>Máximo a futuro: {config.max_days_advance} días</li>
             )}
+            {POLICY_FIELDS.map((f) => (
+              <li key={f.key}>
+                {f.label}: {POLICY_VALUE_LABEL[config.appointment_policies[f.key]]}
+              </li>
+            ))}
           </ul>
         )}
       </SummarySection>

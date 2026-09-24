@@ -20,6 +20,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import AppointmentPoliciesFields, {
+  normalizePolicies,
+  type AppointmentPolicies,
+} from "@/components/AppointmentPoliciesFields";
 
 type Therapist = Tables<"therapists">;
 
@@ -63,6 +67,9 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
   const [virtualMeetingUrl, setVirtualMeetingUrl] = useState("");
   const [cancellationPolicy, setCancellationPolicy] = useState("");
   const [customPromptAdditions, setCustomPromptAdditions] = useState("");
+  const [appointmentPolicies, setAppointmentPolicies] = useState<AppointmentPolicies>(
+    normalizePolicies(null),
+  );
 
   const [slotMinutes, setSlotMinutes] = useState<number>(60);
   const [minHoursAdvance, setMinHoursAdvance] = useState(4);
@@ -80,7 +87,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
       const [configRes, servicesRes] = await Promise.all([
         supabase
           .from("therapist_config")
-          .select("timezone, office_address, virtual_meeting_url, cancellation_policy, custom_prompt_additions, booking_rules")
+          .select("timezone, office_address, virtual_meeting_url, cancellation_policy, custom_prompt_additions, booking_rules, appointment_policies")
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
         supabase
@@ -107,6 +114,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
         setVirtualMeetingUrl(cfg.virtual_meeting_url ?? "");
         setCancellationPolicy(cfg.cancellation_policy ?? "");
         setCustomPromptAdditions(cfg.custom_prompt_additions ?? "");
+        setAppointmentPolicies(normalizePolicies(cfg.appointment_policies));
 
         const rules = (cfg.booking_rules as Record<string, any> | null) ?? {};
         if (typeof rules.slot_minutes === "number") setSlotMinutes(rules.slot_minutes);
@@ -194,6 +202,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
           cancellation_policy: cancellationPolicy.trim(),
           custom_prompt_additions: customPromptAdditions.trim() || null,
           booking_rules: bookingRules as Json,
+          appointment_policies: appointmentPolicies as unknown as Json,
         })
         .eq("therapist_id", therapist.id);
 
@@ -430,6 +439,20 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
           <p className="text-xs text-muted-foreground">
             Emi la repetirá a tus pacientes cuando agenden o intenten cancelar.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Políticas de citas
+          </h3>
+          <AppointmentPoliciesFields
+            value={appointmentPolicies}
+            onChange={(key, value) =>
+              setAppointmentPolicies((prev) => ({ ...prev, [key]: value }))
+            }
+          />
         </CardContent>
       </Card>
 
