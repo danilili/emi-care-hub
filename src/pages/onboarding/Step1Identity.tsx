@@ -34,11 +34,22 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
   // Soft-lock: identity fields become read-only after first save (when therapist.first_name is set).
   const identityLocked = Boolean(therapist.first_name);
 
+  // El asistente se presenta como "el consultorio de {brand_name}" y te nombra aparte;
+  // si el nombre comercial es solo tu nombre, el consultante lo oye dos veces.
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const brandDuplicatesName = (() => {
+    const b = norm(brandName);
+    if (!b) return false;
+    const full = norm(`${firstName} ${lastName}`);
+    return b === full || b === norm(firstName) || b === norm(`${lastName} ${firstName}`);
+  })();
+
   const canSave =
     firstName.trim() &&
     lastName.trim() &&
     profession.trim() &&
-    brandName.trim();
+    brandName.trim() &&
+    (identityLocked || !brandDuplicatesName);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +157,17 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
               disabled={identityLocked}
               required
             />
+            {brandDuplicatesName ? (
+              <p className="text-xs text-destructive">
+                El nombre comercial no debe ser igual a tu nombre: el asistente se presenta como “el consultorio de …”
+                y te nombra aparte. Usa algo como “Consultorio {lastName.trim() || "…"}” o el nombre de tu espacio.
+                {identityLocked && " Para cambiarlo contacta a soporte."}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Así se presenta el asistente: “Escribes al consultorio de {brandName.trim() || "…"}”.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -195,6 +217,9 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://..."
             />
+            <p className="text-xs text-muted-foreground">
+              El asistente lo comparte cuando un consultante pide más información sobre ti o tus servicios.
+            </p>
           </div>
 
           <div className="space-y-1.5">

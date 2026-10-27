@@ -18,12 +18,15 @@ import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 
 type Therapist = Tables<"therapists">;
 
-const MODALITIES = [
-  { value: "in_person", label: "Presencial" },
-  { value: "virtual", label: "Virtual" },
-  { value: "home_visit", label: "A domicilio" },
+import { MODALITIES, type Modality } from "@/lib/modalities";
+
+// A qué citas aplica el servicio: el asistente solo ofrece "first_visit" a quien nunca ha venido.
+const APPLIES_TO = [
+  { value: "any", label: "Cualquier cita" },
+  { value: "first_visit", label: "Solo primera consulta" },
+  { value: "follow_up", label: "Solo seguimiento (ya fue consultante)" },
 ] as const;
-type Modality = (typeof MODALITIES)[number]["value"];
+type AppliesTo = (typeof APPLIES_TO)[number]["value"];
 
 interface VariantDraft {
   modality: Modality | "";
@@ -34,6 +37,9 @@ interface VariantDraft {
 interface ServiceDraft {
   name: string;
   description: string;
+  applies_to: AppliesTo;
+  audience_includes: string;
+  audience_excludes: string;
   variants: VariantDraft[];
 }
 
@@ -54,6 +60,9 @@ const newVariant = (used: Modality[] = []): VariantDraft => {
 const newService = (): ServiceDraft => ({
   name: "",
   description: "",
+  applies_to: "any",
+  audience_includes: "",
+  audience_excludes: "",
   variants: [newVariant()],
 });
 
@@ -67,7 +76,7 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
     const load = async () => {
       const { data, error } = await supabase
         .from("therapist_services")
-        .select("name, description, sort_order, service_variants(modality, duration_minutes, price)")
+        .select("name, description, sort_order, applies_to, audience_includes, audience_excludes, service_variants(modality, duration_minutes, price)")
         .eq("therapist_id", therapist.id)
         .order("sort_order", { ascending: true });
 
@@ -84,6 +93,9 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
           data.map((s) => ({
             name: s.name,
             description: s.description ?? "",
+            applies_to: (APPLIES_TO.some((a) => a.value === s.applies_to) ? s.applies_to : "any") as AppliesTo,
+            audience_includes: s.audience_includes ?? "",
+            audience_excludes: s.audience_excludes ?? "",
             variants: (s.service_variants ?? []).map((v) => ({
               modality: v.modality as Modality,
               duration_minutes: v.duration_minutes,
@@ -174,7 +186,14 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
               duration_minutes: v.duration_minutes,
               price: parseFloat(v.price),
             }));
-          return { name, description: s.description.trim(), variants };
+          return {
+            name,
+            description: s.description.trim(),
+            applies_to: s.applies_to,
+            audience_includes: s.audience_includes.trim(),
+            audience_excludes: s.audience_excludes.trim(),
+            variants,
+          };
         })
         .filter((s) => s.name && s.variants.length > 0);
 
@@ -208,7 +227,7 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
       <div className="space-y-1">
         <h2 className="font-display text-xl font-bold">Tus servicios</h2>
         <p className="text-sm text-muted-foreground">
-          Agrega cada tipo de sesión que ofreces. Un mismo servicio puede tener varias modalidades (presencial, virtual, a domicilio) con precios distintos.
+          Agrega cada tipo de sesión que ofreces. Un mismo servicio puede tener varias modalidades (presencial, en línea, a domicilio) con precios distintos.
         </p>
       </div>
 
@@ -250,10 +269,55 @@ const Step2Services = ({ therapist, onSaved }: Step2Props) => {
                 <Textarea
                   id={`service-desc-${sIdx}`}
                   rows={2}
-                  placeholder="Para qué sirve, a quién va dirigida…"
+                  placeholder="En qué consiste, qué incluye, cómo se trabaja…"
                   value={service.description}
                   onChange={(e) => updateService(sIdx, { description: e.target.value })}
                 />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={`service-inc-${sIdx}`}>A quién SÍ atiende</Label>
+                  <Textarea
+                    id={`service-inc-${sIdx}`}
+                    rows={2}
+                    placeholder="Mujeres desde la primera menstruación; embarazadas y lactantes bienvenidas."
+                    value={service.audience_includes}
+                    onChange={(e) => updateService(sIdx, { audience_includes: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={`service-exc-${sIdx}`}>A quién NO atiende</Label>
+                  <Textarea
+                    id={`service-exc-${sIdx}`}
+                    rows={2}
+                    placeholder="Hombres; infancias; cesárea o cirugía abdominal en los últimos 8 meses."
+                    value={service.audience_excludes}
+                    onChange={(e) => updateService(sIdx, { audience_excludes: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="-mt-2 text-xs text-muted-foreground">
+                El asistente usa estas dos listas para dar informes con tacto y sin diagnosticar. Déjalas vacías si el servicio es para cualquier persona.
+              </p>
+
+              <div className="space-y-1.5">
+                <Label htmlFor={`service-applies-${sIdx}`}>A qué citas aplica</Label>
+                <Select
+                  value={service.applies_to}
+                  onValueChange={(v) => updateService(sIdx, { applies_to: v as AppliesTo })}
+                >
+                  <SelectTrigger id={`service-applies-${sIdx}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {APPLIES_TO.map((a) => (
+                      <SelectItem key={a.value} value={a.value}>
+                        {a.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

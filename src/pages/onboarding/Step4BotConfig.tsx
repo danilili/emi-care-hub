@@ -24,6 +24,22 @@ import AppointmentPoliciesFields, {
   normalizePolicies,
   type AppointmentPolicies,
 } from "@/components/AppointmentPoliciesFields";
+import FirstVisitRulesFields, { type PreviewVariant } from "@/components/FirstVisitRulesFields";
+import AssistantSettingsFields, {
+  ASSISTANT_SETTINGS_COLUMNS,
+  assistantSettingsFromRow,
+  assistantSettingsToPatch,
+  validateAssistantSettings,
+  type AssistantSettings,
+} from "@/components/AssistantSettingsFields";
+import {
+  FIRST_VISIT_RULES_COLUMNS,
+  defaultFirstVisitRules,
+  rulesFromRow,
+  rulesToPatch,
+  validateFirstVisitRules,
+  type FirstVisitRules,
+} from "@/lib/firstVisitRules";
 
 type Therapist = Tables<"therapists">;
 
@@ -66,10 +82,12 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
   const [officeAddress, setOfficeAddress] = useState("");
   const [virtualMeetingUrl, setVirtualMeetingUrl] = useState("");
   const [cancellationPolicy, setCancellationPolicy] = useState("");
-  const [customPromptAdditions, setCustomPromptAdditions] = useState("");
   const [appointmentPolicies, setAppointmentPolicies] = useState<AppointmentPolicies>(
     normalizePolicies(null),
   );
+  const [firstVisit, setFirstVisit] = useState<FirstVisitRules>(defaultFirstVisitRules);
+  const [assistant, setAssistant] = useState<AssistantSettings>(() => assistantSettingsFromRow(null));
+  const [previewVariants, setPreviewVariants] = useState<PreviewVariant[]>([]);
 
   const [slotMinutes, setSlotMinutes] = useState<number>(60);
   const [minHoursAdvance, setMinHoursAdvance] = useState(4);
@@ -87,13 +105,16 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
       const [configRes, servicesRes] = await Promise.all([
         supabase
           .from("therapist_config")
-          .select("timezone, office_address, virtual_meeting_url, cancellation_policy, custom_prompt_additions, booking_rules, appointment_policies")
+          .select(
+            `timezone, office_address, virtual_meeting_url, cancellation_policy, booking_rules, appointment_policies, ${FIRST_VISIT_RULES_COLUMNS}, ${ASSISTANT_SETTINGS_COLUMNS}`,
+          )
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
         supabase
           .from("therapist_services")
-          .select("service_variants(modality)")
-          .eq("therapist_id", therapist.id),
+          .select("name, applies_to, service_variants(modality, price, active)")
+          .eq("therapist_id", therapist.id)
+          .order("sort_order"),
       ]);
 
       if (configRes.error) {
@@ -113,8 +134,9 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
         setOfficeAddress(cfg.office_address ?? "");
         setVirtualMeetingUrl(cfg.virtual_meeting_url ?? "");
         setCancellationPolicy(cfg.cancellation_policy ?? "");
-        setCustomPromptAdditions(cfg.custom_prompt_additions ?? "");
         setAppointmentPolicies(normalizePolicies(cfg.appointment_policies));
+        setFirstVisit(rulesFromRow(cfg as unknown as Record<string, unknown>));
+        setAssistant(assistantSettingsFromRow(cfg as unknown as Record<string, unknown>));
 
         const rules = (cfg.booking_rules as Record<string, any> | null) ?? {};
         if (typeof rules.slot_minutes === "number") setSlotMinutes(rules.slot_minutes);
@@ -133,11 +155,16 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
       }
 
       const modalities = new Set<string>();
+      const preview: PreviewVariant[] = [];
       for (const s of servicesRes.data ?? []) {
         for (const v of s.service_variants ?? []) {
           modalities.add(v.modality);
+          if (v.active !== false) {
+            preview.push({ service_name: s.name, modality: v.modality, price: Number(v.price), applies_to: s.applies_to });
+          }
         }
       }
+      setPreviewVariants(preview);
       setHasInPerson(modalities.has("in_person"));
       setHasVirtual(modalities.has("virtual"));
       setHasHomeVisit(modalities.has("home_visit"));
@@ -169,6 +196,14 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
     if ((blockNextDayDow !== null) !== Boolean(blockNextDayTime)) {
       return "Para bloquear el día siguiente, completa día y hora (o limpia ambos).";
     }
+    const fv = validateFirstVisitRules(firstVisit);
+    if (fv) return fv;
+    const as = validateAssistantSettings(assistant, {
+      first_name: therapist.first_name,
+      last_name: therapist.last_name,
+      alias: assistant.therapist_alias,
+    });
+    if (as) return as;
     return null;
   })();
 
@@ -200,9 +235,10 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
           office_address: officeAddress.trim() || null,
           virtual_meeting_url: virtualMeetingUrl.trim() || null,
           cancellation_policy: cancellationPolicy.trim(),
-          custom_prompt_additions: customPromptAdditions.trim() || null,
           booking_rules: bookingRules as Json,
           appointment_policies: appointmentPolicies as unknown as Json,
+          ...rulesToPatch(firstVisit),
+          ...assistantSettingsToPatch(assistant),
         })
         .eq("therapist_id", therapist.id);
 
@@ -228,9 +264,9 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-1">
-        <h2 className="font-display text-xl font-bold">Configuración del bot</h2>
+        <h2 className="font-display text-xl font-bold">Configuración del asistente</h2>
         <p className="text-sm text-muted-foreground">
-          Reglas que Emi usará para responder a tus pacientes y agendar sus citas.
+          Reglas con las que el asistente responde a tus consultantes y agenda sus citas. Todo lo que cambia su comportamiento sale de estos campos.
         </p>
       </div>
 
@@ -437,7 +473,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
             onChange={(e) => setCancellationPolicy(e.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            Emi la repetirá a tus pacientes cuando agenden o intenten cancelar.
+            Se repite al consultante cuando agenda o intenta cancelar. Si pides anticipo, configúralo abajo en “Primera consulta”: ahí sí lo aplica el asistente.
           </p>
         </CardContent>
       </Card>
@@ -459,18 +495,32 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
       <Card>
         <CardContent className="space-y-4 p-5">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Instrucciones adicionales (opcional)
+            Primera consulta
           </h3>
-          <Textarea
-            id="custom_prompt"
-            rows={4}
-            placeholder="Tu estilo de comunicación, temas que prefieres evitar, frases típicas que usas, etc."
-            value={customPromptAdditions}
-            onChange={(e) => setCustomPromptAdditions(e.target.value)}
-          />
           <p className="text-xs text-muted-foreground">
-            Cualquier cosa que quieras que Emi tenga en cuenta al hablar con tus pacientes.
+            Anticipo, información previa y anticipación mínima para quien nunca ha venido. Si no pides nada, déjalo como está.
           </p>
+          <FirstVisitRulesFields
+            value={firstVisit}
+            onChange={(patch) => setFirstVisit((prev) => ({ ...prev, ...patch }))}
+            variants={previewVariants}
+            bookingMinHours={minHoursAdvance}
+            idPrefix="ob-fvr"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-4 p-5">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Acompañantes, avisos y voz
+          </h3>
+          <AssistantSettingsFields
+            value={assistant}
+            onChange={(patch) => setAssistant((prev) => ({ ...prev, ...patch }))}
+            names={{ first_name: therapist.first_name, last_name: therapist.last_name, alias: assistant.therapist_alias }}
+            idPrefix="ob-ast"
+          />
         </CardContent>
       </Card>
 

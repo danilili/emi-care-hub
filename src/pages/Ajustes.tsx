@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, CalendarCheck, Landmark, Loader2, Search, ShieldCheck, UserX, X } from "lucide-react";
+import { Bot, Brain, CalendarCheck, CalendarRange, Globe, Landmark, Loader2, Search, ShieldCheck, Sparkles, UserX, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserConfig } from "@/hooks/useUserConfig";
@@ -20,11 +20,27 @@ import AppointmentPoliciesFields, {
   type PolicyValue,
 } from "@/components/AppointmentPoliciesFields";
 import type { Json } from "@/integrations/supabase/types";
+import FirstVisitRulesFields, { type PreviewVariant } from "@/components/FirstVisitRulesFields";
+import AssistantSettingsFields, {
+  ASSISTANT_SETTINGS_COLUMNS,
+  assistantSettingsFromRow,
+  assistantSettingsToPatch,
+  validateAssistantSettings,
+  type AssistantSettings,
+} from "@/components/AssistantSettingsFields";
+import SharedCalendarsFields, { normalizeCalendarIds } from "@/components/SharedCalendarsFields";
+import {
+  FIRST_VISIT_RULES_COLUMNS,
+  rulesFromRow,
+  rulesToPatch,
+  validateFirstVisitRules,
+  type FirstVisitRules,
+} from "@/lib/firstVisitRules";
 
 // Los tipos generados de Supabase aún no incluyen las columnas nuevas de
 // therapist_config/patients; se usa (supabase as any) como en el resto del repo.
 
-interface AjustesConfig {
+interface AjustesConfig extends Record<string, unknown> {
   bank_name: string | null;
   bank_clabe: string | null;
   bank_account_number: string | null;
@@ -32,6 +48,25 @@ interface AjustesConfig {
   only_known_patients: boolean | null;
   exclusion_list_enabled: boolean | null;
   appointment_policies: Json | null;
+  booking_rules: Json | null;
+  calendar_id: string | null;
+  availability_calendar_ids: string[] | null;
+}
+
+interface TherapistLite {
+  first_name: string | null;
+  last_name: string | null;
+  website_url: string | null;
+}
+
+/** Update de therapist_config con verificación de filas afectadas (patrón del resto de la página). */
+async function saveConfig(therapistId: string, fields: Record<string, unknown>) {
+  const { data, error } = await (supabase as any)
+    .from("therapist_config")
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq("therapist_id", therapistId)
+    .select("therapist_id");
+  return !error && Boolean(data?.length);
 }
 
 interface PatientLite {
@@ -258,6 +293,233 @@ function PoliciesCard({ therapistId, config }: { therapistId: string; config: Aj
   );
 }
 
+// ── Primera consulta (anticipo, intake, anticipación) ─────────────────────────
+
+function FirstVisitCard({
+  therapistId,
+  config,
+  variants,
+}: {
+  therapistId: string;
+  config: AjustesConfig;
+  variants: PreviewVariant[];
+}) {
+  const queryClient = useQueryClient();
+  const [rules, setRules] = useState<FirstVisitRules>(() => rulesFromRow(config));
+  const [saving, setSaving] = useState(false);
+  const error = validateFirstVisitRules(rules);
+  const bookingRules = (config.booking_rules as Record<string, unknown> | null) ?? {};
+  const bookingMin = typeof bookingRules.min_hours_advance === "number" ? bookingRules.min_hours_advance : null;
+
+  const handleSave = async () => {
+    if (error || saving) return;
+    setSaving(true);
+    const ok = await saveConfig(therapistId, rulesToPatch(rules));
+    setSaving(false);
+    if (!ok) {
+      toast.error("Error al guardar las reglas de primera consulta");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ajustes-config"] });
+    toast.success("Reglas de primera consulta guardadas", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <Sparkles className="h-5 w-5 text-primary" />
+          Primera consulta
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-xs text-muted-foreground">
+          Aplica a quien nunca ha tenido consulta contigo. Las citas ya creadas no se recalculan; al mover una cita sí se recalculan sus plazos.
+        </p>
+        <FirstVisitRulesFields
+          value={rules}
+          onChange={(patch) => setRules((prev) => ({ ...prev, ...patch }))}
+          variants={variants}
+          bookingMinHours={bookingMin}
+          idPrefix="aj-fvr"
+        />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={Boolean(error) || saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Asistente: acompañantes, avisos, voz y notas ──────────────────────────────
+
+function AssistantCard({
+  therapistId,
+  config,
+  therapist,
+}: {
+  therapistId: string;
+  config: AjustesConfig;
+  therapist: TherapistLite;
+}) {
+  const queryClient = useQueryClient();
+  const [settings, setSettings] = useState<AssistantSettings>(() => assistantSettingsFromRow(config));
+  const [saving, setSaving] = useState(false);
+  const names = { first_name: therapist.first_name, last_name: therapist.last_name, alias: settings.therapist_alias };
+  const error = validateAssistantSettings(settings, names);
+
+  const handleSave = async () => {
+    if (error || saving) return;
+    setSaving(true);
+    const ok = await saveConfig(therapistId, assistantSettingsToPatch(settings));
+    setSaving(false);
+    if (!ok) {
+      toast.error("Error al guardar los ajustes del asistente");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ajustes-config"] });
+    toast.success("Ajustes del asistente guardados", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <Bot className="h-5 w-5 text-primary" />
+          Asistente
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <AssistantSettingsFields
+          value={settings}
+          onChange={(patch) => setSettings((prev) => ({ ...prev, ...patch }))}
+          names={names}
+          idPrefix="aj-ast"
+        />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={Boolean(error) || saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Calendarios ───────────────────────────────────────────────────────────────
+
+function CalendarsCard({ therapistId, config }: { therapistId: string; config: AjustesConfig }) {
+  const queryClient = useQueryClient();
+  const [calendars, setCalendars] = useState<string[]>(() => normalizeCalendarIds(config.availability_calendar_ids));
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    const ok = await saveConfig(therapistId, { availability_calendar_ids: calendars });
+    setSaving(false);
+    if (!ok) {
+      toast.error("Error al guardar los calendarios");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ajustes-config"] });
+    toast.success("Calendarios guardados", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <CalendarRange className="h-5 w-5 text-primary" />
+          Calendarios
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">Calendario donde se escriben las citas</Label>
+          <p className="text-sm text-muted-foreground">{config.calendar_id ?? "Sin configurar (contacta a soporte)."}</p>
+        </div>
+        <SharedCalendarsFields value={calendars} onChange={setCalendars} writeCalendarId={config.calendar_id ?? ""} />
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Sitio web ─────────────────────────────────────────────────────────────────
+
+function WebsiteCard({ therapistId, therapist }: { therapistId: string; therapist: TherapistLite }) {
+  const queryClient = useQueryClient();
+  const [url, setUrl] = useState(therapist.website_url ?? "");
+  const [saving, setSaving] = useState(false);
+  const trimmed = url.trim();
+  const invalid = trimmed !== "" && !/^https?:\/\/\S+$/i.test(trimmed);
+
+  const handleSave = async () => {
+    if (invalid || saving) return;
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("therapists")
+      .update({ website_url: trimmed || null })
+      .eq("id", therapistId)
+      .select("id");
+    setSaving(false);
+    if (error || !data?.length) {
+      toast.error("Error al guardar el sitio web");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ajustes-therapist"] });
+    toast.success("Sitio web guardado", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <Globe className="h-5 w-5 text-primary" />
+          Sitio web
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="website-url">URL</Label>
+          <Input
+            id="website-url"
+            type="url"
+            placeholder="https://tusitio.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          {invalid ? (
+            <p className="text-xs text-destructive">Debe empezar con https://</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              El asistente lo comparte cuando un consultante pide más información sobre ti o tus servicios.
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={invalid || saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── Lista de exclusión ────────────────────────────────────────────────────────
 
 function ExclusionCard() {
@@ -428,12 +690,48 @@ const Ajustes = () => {
       const { data, error } = await (supabase as any)
         .from("therapist_config")
         .select(
-          "bank_name, bank_clabe, bank_account_number, bank_account_holder, only_known_patients, exclusion_list_enabled, appointment_policies",
+          `bank_name, bank_clabe, bank_account_number, bank_account_holder, only_known_patients, exclusion_list_enabled, appointment_policies, booking_rules, calendar_id, availability_calendar_ids, ${FIRST_VISIT_RULES_COLUMNS}, ${ASSISTANT_SETTINGS_COLUMNS}`,
         )
         .eq("therapist_id", therapistId)
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as AjustesConfig | null;
+    },
+  });
+
+  const { data: therapist } = useQuery({
+    queryKey: ["ajustes-therapist", therapistId],
+    enabled: isV2 && Boolean(therapistId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("therapists")
+        .select("first_name, last_name, website_url")
+        .eq("id", therapistId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as TherapistLite | null;
+    },
+  });
+
+  const { data: variants } = useQuery({
+    queryKey: ["ajustes-variants", therapistId],
+    enabled: isV2 && Boolean(therapistId),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("therapist_services")
+        .select("name, applies_to, active, service_variants(modality, price, active)")
+        .eq("therapist_id", therapistId)
+        .order("sort_order");
+      if (error) throw error;
+      const out: PreviewVariant[] = [];
+      for (const s of data ?? []) {
+        if (s.active === false) continue;
+        for (const v of s.service_variants ?? []) {
+          if (v.active === false) continue;
+          out.push({ service_name: s.name, modality: v.modality, price: Number(v.price), applies_to: s.applies_to });
+        }
+      }
+      return out;
     },
   });
 
@@ -487,8 +785,16 @@ const Ajustes = () => {
         ) : (
           <div className="space-y-5">
             <BankCard therapistId={therapistId} config={ajustes} />
+            <FirstVisitCard therapistId={therapistId} config={ajustes} variants={variants ?? []} />
+            <AssistantCard
+              therapistId={therapistId}
+              config={ajustes}
+              therapist={therapist ?? { first_name: null, last_name: null, website_url: null }}
+            />
             <ScopeCard therapistId={therapistId} config={ajustes} />
             <PoliciesCard therapistId={therapistId} config={ajustes} />
+            <CalendarsCard therapistId={therapistId} config={ajustes} />
+            {therapist && <WebsiteCard therapistId={therapistId} therapist={therapist} />}
             <ExclusionCard />
           </div>
         )}

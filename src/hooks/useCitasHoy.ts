@@ -34,7 +34,7 @@ export function useCitasHoy(config: UserConfig | null | undefined) {
         .order("hora", { ascending: true });
 
       if (error) throw error;
-      return data as Cita[];
+      return (data ?? []).map((r: any) => ({ ...r, v2: null })) as Cita[];
     },
   });
 }

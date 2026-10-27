@@ -7,13 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
+import { MODALITIES, type Modality } from "@/lib/modalities";
+import SharedCalendarsFields, { normalizeCalendarIds } from "@/components/SharedCalendarsFields";
 
 type Therapist = Tables<"therapists">;
 
 interface Block {
   start: string;
   end: string;
+  /** "" = cualquier modalidad (comportamiento actual). */
+  modality: Modality | "";
 }
 
 type Schedule = Record<number, Block[]>;
@@ -32,12 +43,14 @@ const DAYS = [
 const emptySchedule = (): Schedule =>
   DAYS.reduce((acc, d) => ({ ...acc, [d.value]: [] }), {} as Schedule);
 
-const newBlock = (): Block => ({ start: "09:00", end: "18:00" });
+const newBlock = (): Block => ({ start: "09:00", end: "18:00", modality: "" });
 
 // Trims "HH:MM:SS" → "HH:MM" so HTML time inputs don't reject it.
 const timeToInput = (t: string) => (t.length >= 5 ? t.slice(0, 5) : t);
 
 const overlaps = (a: Block, b: Block) => a.start < b.end && b.start < a.end;
+// Dos bloques solo chocan si comparten modalidad o alguno vale para cualquiera.
+const sameLane = (a: Block, b: Block) => !a.modality || !b.modality || a.modality === b.modality;
 
 interface Step3Props {
   therapist: Therapist;
@@ -51,20 +64,26 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule);
   const [calendarId, setCalendarId] = useState("");
   const [noCalendar, setNoCalendar] = useState(false);
+  const [blockingCalendars, setBlockingCalendars] = useState<string[]>([]);
+  const [offeredModalities, setOfferedModalities] = useState<Modality[]>([]);
 
   useEffect(() => {
     const load = async () => {
-      const [schedulesRes, configRes] = await Promise.all([
+      const [schedulesRes, configRes, servicesRes] = await Promise.all([
         supabase
           .from("therapist_schedules")
-          .select("day_of_week, start_time, end_time")
+          .select("day_of_week, start_time, end_time, modality")
           .eq("therapist_id", therapist.id)
           .order("start_time", { ascending: true }),
         supabase
           .from("therapist_config")
-          .select("calendar_id")
+          .select("calendar_id, availability_calendar_ids")
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
+        supabase
+          .from("therapist_services")
+          .select("service_variants(modality)")
+          .eq("therapist_id", therapist.id),
       ]);
 
       if (schedulesRes.error) {
@@ -84,6 +103,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
         next[row.day_of_week].push({
           start: timeToInput(row.start_time),
           end: timeToInput(row.end_time),
+          modality: (MODALITIES.some((m) => m.value === row.modality) ? row.modality : "") as Modality | "",
         });
       }
       setSchedule(next);
@@ -93,6 +113,15 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
         setCalendarId(savedCalId);
         setNoCalendar(false);
       }
+      setBlockingCalendars(normalizeCalendarIds(configRes.data?.availability_calendar_ids));
+
+      const mods = new Set<Modality>();
+      for (const s of servicesRes.data ?? []) {
+        for (const v of s.service_variants ?? []) {
+          if (MODALITIES.some((m) => m.value === v.modality)) mods.add(v.modality as Modality);
+        }
+      }
+      setOfferedModalities(MODALITIES.map((m) => m.value).filter((m) => mods.has(m)));
 
       setLoading(false);
     };
@@ -117,9 +146,15 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
     }));
   };
 
+  // Solo tiene sentido elegir modalidad por bloque cuando se ofrece más de una.
+  const showModality = offeredModalities.length > 1;
+
   const validationError = (() => {
     if (!noCalendar && !calendarId.trim()) {
       return "Indica el calendar de Google o marca la casilla \"No tengo un calendar todavía\".";
+    }
+    if (!noCalendar && blockingCalendars.some((c) => c === calendarId.trim())) {
+      return "El calendario donde se escriben las citas ya bloquea disponibilidad; no lo repitas en la lista.";
     }
 
     const total = DAYS.reduce((sum, d) => sum + schedule[d.value].length, 0);
@@ -133,7 +168,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
       }
       for (let i = 0; i < blocks.length; i++) {
         for (let j = i + 1; j < blocks.length; j++) {
-          if (overlaps(blocks[i], blocks[j]))
+          if (overlaps(blocks[i], blocks[j]) && sameLane(blocks[i], blocks[j]))
             return `${d.label}: los bloques se traslapan.`;
         }
       }
@@ -149,14 +184,22 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
     try {
       const { error: configErr } = await supabase
         .from("therapist_config")
-        .update({ calendar_id: noCalendar ? null : calendarId.trim() })
+        .update({
+          calendar_id: noCalendar ? null : calendarId.trim(),
+          availability_calendar_ids: blockingCalendars,
+        })
         .eq("therapist_id", therapist.id);
       if (configErr) throw configErr;
 
-      const payload: { day_of_week: number; start_time: string; end_time: string }[] = [];
+      const payload: { day_of_week: number; start_time: string; end_time: string; modality: string | null }[] = [];
       for (const d of DAYS) {
         for (const b of schedule[d.value]) {
-          payload.push({ day_of_week: d.value, start_time: b.start, end_time: b.end });
+          payload.push({
+            day_of_week: d.value,
+            start_time: b.start,
+            end_time: b.end,
+            modality: showModality && b.modality ? b.modality : null,
+          });
         }
       }
 
@@ -188,7 +231,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
       <div className="space-y-1">
         <h2 className="font-display text-xl font-bold">Tu agenda</h2>
         <p className="text-sm text-muted-foreground">
-          Conecta el Google Calendar que Emi usará para agendar y selecciona los días y horarios en que ofreces sesiones.
+          Conecta el Google Calendar donde se escribirán las citas y selecciona los días y horarios en que ofreces sesiones.
         </p>
       </div>
 
@@ -199,7 +242,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
           </h3>
           {!noCalendar && (
             <div className="space-y-1.5">
-              <Label htmlFor="calendar_id">ID del calendar *</Label>
+              <Label htmlFor="calendar_id">ID del calendar donde se escriben las citas *</Label>
               <Input
                 id="calendar_id"
                 placeholder="abc123@group.calendar.google.com"
@@ -207,7 +250,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
                 onChange={(e) => setCalendarId(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Pega aquí el ID del calendar que Emi usará para sincronizar tus citas. Lo encuentras en Google Calendar → Configuración del calendario → Integrar calendario. Si aún no tienes uno, marca la casilla y nuestro equipo te ayudará a configurarlo.
+                Lo encuentras en Google Calendar → Configuración del calendario → Integrar calendario. Si aún no tienes uno, marca la casilla y nuestro equipo te ayudará a configurarlo.
               </p>
             </div>
           )}
@@ -225,6 +268,12 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
               No tengo un Google Calendar todavía
             </Label>
           </div>
+
+          <SharedCalendarsFields
+            value={blockingCalendars}
+            onChange={setBlockingCalendars}
+            writeCalendarId={noCalendar ? "" : calendarId}
+          />
         </CardContent>
       </Card>
 
@@ -233,6 +282,11 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Horarios de atención
           </h3>
+          {showModality && (
+            <p className="text-xs text-muted-foreground">
+              Ofreces más de una modalidad: puedes indicar en qué horarios atiendes cada una. “Cualquier modalidad” sirve para ambas.
+            </p>
+          )}
           {DAYS.map((d) => {
             const blocks = schedule[d.value];
             return (
@@ -256,7 +310,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
                       {blocks.map((block, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center gap-2 rounded-lg border border-border bg-background/50 p-2"
+                          className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background/50 p-2"
                         >
                           <Input
                             type="time"
@@ -271,6 +325,26 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
                             onChange={(e) => updateBlock(d.value, idx, { end: e.target.value })}
                             className="w-28"
                           />
+                          {showModality && (
+                            <Select
+                              value={block.modality || "any"}
+                              onValueChange={(v) =>
+                                updateBlock(d.value, idx, { modality: v === "any" ? "" : (v as Modality) })
+                              }
+                            >
+                              <SelectTrigger className="w-44" aria-label="Modalidad del bloque">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="any">Cualquier modalidad</SelectItem>
+                                {MODALITIES.filter((m) => offeredModalities.includes(m.value)).map((m) => (
+                                  <SelectItem key={m.value} value={m.value}>
+                                    {m.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <Button
                             type="button"
                             variant="ghost"

@@ -13,14 +13,17 @@ import {
   POLICY_VALUE_LABEL,
   type AppointmentPolicies,
 } from "@/components/AppointmentPoliciesFields";
+import { COMPANIONS_LABEL, assistantSettingsFromRow, type AssistantSettings } from "@/components/AssistantSettingsFields";
+import {
+  DEPOSIT_APPLIES_LABEL,
+  INTAKE_MODE_LABEL,
+  formatMXN,
+  rulesFromRow,
+  type FirstVisitRules,
+} from "@/lib/firstVisitRules";
+import { modalityLabel } from "@/lib/modalities";
 
 type Therapist = Tables<"therapists">;
-
-const MODALITY_LABEL: Record<string, string> = {
-  in_person: "Presencial",
-  virtual: "Virtual",
-  home_visit: "A domicilio",
-};
 
 const DAY_LABEL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
@@ -37,11 +40,14 @@ const DOC_LABEL: Record<string, string> = {
 interface ServiceSummary {
   name: string;
   variant_count: number;
+  applies_to: string | null;
+  audience_includes: string | null;
+  audience_excludes: string | null;
 }
 
 interface ScheduleByDay {
   day_of_week: number;
-  blocks: { start_time: string; end_time: string }[];
+  blocks: { start_time: string; end_time: string; modality: string | null }[];
 }
 
 interface ConfigSummary {
@@ -52,6 +58,10 @@ interface ConfigSummary {
   payment_count: number;
   has_fiscal: boolean;
   appointment_policies: AppointmentPolicies;
+  calendar_id: string | null;
+  blocking_calendars: string[];
+  first_visit: FirstVisitRules;
+  assistant: AssistantSettings;
 }
 
 interface Step7Props {
@@ -88,18 +98,18 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
       const [servicesRes, schedulesRes, configRes, docsRes] = await Promise.all([
         supabase
           .from("therapist_services")
-          .select("name, service_variants(modality)")
+          .select("name, applies_to, audience_includes, audience_excludes, service_variants(modality)")
           .eq("therapist_id", therapist.id)
           .order("sort_order"),
         supabase
           .from("therapist_schedules")
-          .select("day_of_week, start_time, end_time")
+          .select("day_of_week, start_time, end_time, modality")
           .eq("therapist_id", therapist.id)
           .order("day_of_week")
           .order("start_time"),
         supabase
           .from("therapist_config")
-          .select("timezone, payment_methods, booking_rules, appointment_policies")
+          .select("*")
           .eq("therapist_id", therapist.id)
           .maybeSingle(),
         supabase
@@ -126,13 +136,16 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
         (servicesRes.data ?? []).map((s) => ({
           name: s.name,
           variant_count: s.service_variants?.length ?? 0,
+          applies_to: s.applies_to,
+          audience_includes: s.audience_includes,
+          audience_excludes: s.audience_excludes,
         })),
       );
 
-      const byDay = new Map<number, { start_time: string; end_time: string }[]>();
+      const byDay = new Map<number, { start_time: string; end_time: string; modality: string | null }[]>();
       for (const row of schedulesRes.data ?? []) {
         const list = byDay.get(row.day_of_week) ?? [];
-        list.push({ start_time: row.start_time, end_time: row.end_time });
+        list.push({ start_time: row.start_time, end_time: row.end_time, modality: row.modality });
         byDay.set(row.day_of_week, list);
       }
       // Display order Mon→Sun (1..6, then 0).
@@ -150,6 +163,10 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
         payment_count: payments.length,
         has_fiscal: (docsRes.data ?? []).some((d) => d.document_type === "fiscal_certificate"),
         appointment_policies: normalizePolicies(cfg?.appointment_policies),
+        calendar_id: cfg?.calendar_id ?? null,
+        blocking_calendars: Array.isArray(cfg?.availability_calendar_ids) ? cfg.availability_calendar_ids : [],
+        first_visit: rulesFromRow(cfg as unknown as Record<string, unknown>),
+        assistant: assistantSettingsFromRow(cfg as unknown as Record<string, unknown>),
       });
 
       setDocuments(
@@ -239,8 +256,15 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
               <li key={i}>
                 <span className="font-medium text-card-foreground">{s.name}</span>{" "}
                 <span className="text-muted-foreground">
-                  ({s.variant_count} {s.variant_count === 1 ? "modalidad" : "modalidades"})
+                  ({s.variant_count} {s.variant_count === 1 ? "modalidad" : "modalidades"}
+                  {s.applies_to === "first_visit" ? ", solo primera consulta" : s.applies_to === "follow_up" ? ", solo seguimiento" : ""})
                 </span>
+                {(s.audience_includes || s.audience_excludes) && (
+                  <ul className="ml-3 text-xs text-muted-foreground">
+                    {s.audience_includes && <li>Sí: {s.audience_includes}</li>}
+                    {s.audience_excludes && <li>No: {s.audience_excludes}</li>}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -248,6 +272,12 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
       </SummarySection>
 
       <SummarySection title="Agenda" onEdit={() => goToStep(2)}>
+        {config && (
+          <p className="mb-2 text-sm text-muted-foreground">
+            Calendario: {config.calendar_id ?? "pendiente"}
+            {config.blocking_calendars.length > 0 && ` · bloquean además: ${config.blocking_calendars.join(", ")}`}
+          </p>
+        )}
         {schedule.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin bloques de horario.</p>
         ) : (
@@ -257,7 +287,10 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
                 <span className="font-medium text-card-foreground">{DAY_LABEL[d.day_of_week]}:</span>{" "}
                 <span className="text-muted-foreground">
                   {d.blocks
-                    .map((b) => `${fmtTime(b.start_time)}–${fmtTime(b.end_time)}`)
+                    .map(
+                      (b) =>
+                        `${fmtTime(b.start_time)}–${fmtTime(b.end_time)}${b.modality ? ` (${modalityLabel(b.modality)})` : ""}`,
+                    )
                     .join(", ")}
                 </span>
               </li>
@@ -286,6 +319,42 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
                 {f.label}: {POLICY_VALUE_LABEL[config.appointment_policies[f.key]]}
               </li>
             ))}
+          </ul>
+        )}
+      </SummarySection>
+
+      <SummarySection title="Primera consulta" onEdit={() => goToStep(3)}>
+        {config && (
+          <ul className="space-y-0.5 text-sm text-muted-foreground">
+            <li>
+              Anticipo:{" "}
+              {config.first_visit.deposit_mode === "none"
+                ? "no se pide"
+                : config.first_visit.deposit_mode === "full"
+                  ? "pago completo por adelantado"
+                  : config.first_visit.deposit_kind === "amount" && config.first_visit.deposit_amount !== null
+                    ? formatMXN(config.first_visit.deposit_amount)
+                    : `${config.first_visit.deposit_percent ?? "?"} %`}
+              {config.first_visit.deposit_mode !== "none" &&
+                ` · ${DEPOSIT_APPLIES_LABEL[config.first_visit.deposit_applies_to].toLowerCase()}` +
+                  (config.first_visit.deposit_deadline_days !== null
+                    ? ` · plazo ${config.first_visit.deposit_deadline_days} días antes`
+                    : "")}
+            </li>
+            <li>
+              Antes de la consulta: {INTAKE_MODE_LABEL[config.first_visit.intake_mode].toLowerCase()}
+              {config.first_visit.intake_mode === "form" && ` · ${config.first_visit.intake_form_url}`}
+              {config.first_visit.intake_mode === "question" && ` · “${config.first_visit.intake_question_text}”`}
+            </li>
+            <li>
+              Anticipación mínima para primeras consultas:{" "}
+              {config.first_visit.first_visit_min_hours_advance !== null
+                ? `${config.first_visit.first_visit_min_hours_advance} h`
+                : "la general de la agenda"}
+            </li>
+            <li>Acompañantes: {COMPANIONS_LABEL[config.assistant.companions_policy].toLowerCase()}</li>
+            <li>Avisos de citas: {config.assistant.notify_owner_bookings ? "activados" : "desactivados"}</li>
+            <li>Alertas de crisis: {config.assistant.crisis_alerts_enabled ? "activadas" : "desactivadas"}</li>
           </ul>
         )}
       </SummarySection>
