@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ShieldAlert, ShieldCheck, Loader2, AlertTriangle, CalendarCheck, Clock, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   AlertDialog,
@@ -119,13 +119,16 @@ function useEmergencyState(config: UserConfig | null | undefined) {
   });
 }
 
-const fmtDate = (iso: string) => format(parseISO(iso), "d 'de' MMMM yyyy", { locale: es });
+// Tolerantes a vacío/inválido: el JSX de los diálogos se evalúa aunque estén cerrados
+// (con el formulario a medio llenar las fechas pueden ser "").
+const fmtDate = (iso: string | null | undefined) => {
+  const d = parseISO(iso ?? "");
+  return isValid(d) ? format(d, "d 'de' MMMM yyyy", { locale: es }) : "—";
+};
 const fmtDayTime = (fecha: string, hora: string) => {
-  try {
-    return `${format(parseISO(fecha), "EEEE d 'de' MMMM", { locale: es })} · ${hora.slice(0, 5)}`;
-  } catch {
-    return `${fecha} · ${hora}`;
-  }
+  const d = parseISO(fecha ?? "");
+  const h = String(hora ?? "").slice(0, 5);
+  return isValid(d) ? `${format(d, "EEEE d 'de' MMMM", { locale: es })} · ${h}` : `${fecha} · ${h}`;
 };
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
