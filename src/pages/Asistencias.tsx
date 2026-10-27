@@ -338,16 +338,11 @@ const Asistencias = () => {
 
         if (rpcError) throw rpcError;
 
-        // Proactividad (mismo espíritu que V1): recibo inmediato o cobro programado.
-        // Cortesía con monto > 0 también manda comprobante; con monto 0 queda en silencio.
+        // Proactividad: solo cobro de adeudo (programado 10:00–18:30).
+        // Decisión 2026-10-27: ya no se manda recibo al registrar un pago; ningún
+        // terapeuta lo hace en la práctica. La cobranza de adeudos se mantiene.
         const webhookCobranza = import.meta.env.VITE_N8N_WEBHOOK_COBRANZA_V2;
-        const tipo = svc
-          ? "receipt"
-          : esAdeudo
-            ? "debt"
-            : esCortesia && montoLibre > 0
-              ? "receipt"
-              : null;
+        const tipo = esAdeudo ? "debt" : null;
         if (esPresente && tipo && webhookCobranza && !webhookCobranza.startsWith("PLACEHOLDER")) {
           fetch(webhookCobranza, {
             method: "POST",

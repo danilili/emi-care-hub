@@ -16,6 +16,7 @@ import {
   FileText,
   LogOut,
   User,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Step1Identity from "./onboarding/Step1Identity";
@@ -24,6 +25,7 @@ import Step3Schedule from "./onboarding/Step3Schedule";
 import Step4BotConfig from "./onboarding/Step4BotConfig";
 import Step5Billing from "./onboarding/Step5Billing";
 import Step6Documents from "./onboarding/Step6Documents";
+import Step6Patients from "./onboarding/Step6Patients";
 import Step7Review from "./onboarding/Step7Review";
 
 type Therapist = Tables<"therapists">;
@@ -32,9 +34,10 @@ const STEPS = [
   { icon: User, label: "Identidad" },
   { icon: Briefcase, label: "Servicios" },
   { icon: CalendarDays, label: "Agenda" },
-  { icon: Bot, label: "Bot" },
+  { icon: Bot, label: "Asistente" },
   { icon: CreditCard, label: "Cobro" },
   { icon: FileText, label: "Documentos" },
+  { icon: Users, label: "Pacientes" },
   { icon: ClipboardCheck, label: "Revisar" },
 ] as const;
 
@@ -172,7 +175,8 @@ const Onboarding = () => {
         {step === 3 && <Step4BotConfig therapist={therapist} onSaved={advance} />}
         {step === 4 && <Step5Billing therapist={therapist} onSaved={advance} />}
         {step === 5 && <Step6Documents therapist={therapist} onSaved={advance} />}
-        {step === 6 && <Step7Review therapist={therapist} goToStep={setStep} />}
+        {step === 6 && <Step6Patients therapist={therapist} onSaved={advance} />}
+        {step === 7 && <Step7Review therapist={therapist} goToStep={setStep} />}
       </main>
 
       <footer className="border-t border-border bg-card/80 backdrop-blur-md">

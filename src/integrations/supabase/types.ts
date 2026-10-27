@@ -1110,9 +1110,13 @@ export type Database = {
           deposit_deadline_days: number | null
           deposit_mode: string
           deposit_percent: number | null
+          emergency_activated_at: string | null
+          emergency_end_date: string | null
           emergency_message: string | null
           emergency_mode: boolean
+          emergency_reason: string | null
           emergency_return_date: string | null
+          emergency_start_date: string | null
           emotional_guidelines: string | null
           evolution_api_key: string | null
           evolution_instance: string
@@ -1133,7 +1137,10 @@ export type Database = {
           notify_owner_bookings: boolean
           office_address: string | null
           only_known_patients: boolean
+          patient_import_mode: string
           payment_methods: Json | null
+          receipt_enabled: boolean
+          receipt_template: string | null
           reminders_enabled: boolean
           therapist_alias: string | null
           therapist_id: string
@@ -1166,9 +1173,13 @@ export type Database = {
           deposit_deadline_days?: number | null
           deposit_mode?: string
           deposit_percent?: number | null
+          emergency_activated_at?: string | null
+          emergency_end_date?: string | null
           emergency_message?: string | null
           emergency_mode?: boolean
+          emergency_reason?: string | null
           emergency_return_date?: string | null
+          emergency_start_date?: string | null
           emotional_guidelines?: string | null
           evolution_api_key?: string | null
           evolution_instance: string
@@ -1189,7 +1200,10 @@ export type Database = {
           notify_owner_bookings?: boolean
           office_address?: string | null
           only_known_patients?: boolean
+          patient_import_mode?: string
           payment_methods?: Json | null
+          receipt_enabled?: boolean
+          receipt_template?: string | null
           reminders_enabled?: boolean
           therapist_alias?: string | null
           therapist_id: string
@@ -1222,9 +1236,13 @@ export type Database = {
           deposit_deadline_days?: number | null
           deposit_mode?: string
           deposit_percent?: number | null
+          emergency_activated_at?: string | null
+          emergency_end_date?: string | null
           emergency_message?: string | null
           emergency_mode?: boolean
+          emergency_reason?: string | null
           emergency_return_date?: string | null
+          emergency_start_date?: string | null
           emotional_guidelines?: string | null
           evolution_api_key?: string | null
           evolution_instance?: string
@@ -1245,7 +1263,10 @@ export type Database = {
           notify_owner_bookings?: boolean
           office_address?: string | null
           only_known_patients?: boolean
+          patient_import_mode?: string
           payment_methods?: Json | null
+          receipt_enabled?: boolean
+          receipt_template?: string | null
           reminders_enabled?: boolean
           therapist_alias?: string | null
           therapist_id?: string

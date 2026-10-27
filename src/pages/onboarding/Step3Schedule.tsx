@@ -25,7 +25,19 @@ interface Block {
   end: string;
   /** "" = cualquier modalidad (comportamiento actual). */
   modality: Modality | "";
+  /** "" = cualquier servicio. Un bloque puede acotarse a un servicio concreto (p. ej. "solo los viernes"). */
+  service_id: string;
 }
+
+interface ServiceOption {
+  id: string;
+  name: string;
+}
+
+// Correo de la cuenta de Google con la que el sistema lee y escribe calendarios.
+// El tenant debe compartir su calendario con ella con permiso "Hacer cambios en eventos".
+const CALENDAR_SERVICE_EMAIL =
+  (import.meta.env.VITE_CALENDAR_SERVICE_EMAIL as string | undefined)?.trim() || "emi@reservalia.mx";
 
 type Schedule = Record<number, Block[]>;
 
@@ -43,14 +55,16 @@ const DAYS = [
 const emptySchedule = (): Schedule =>
   DAYS.reduce((acc, d) => ({ ...acc, [d.value]: [] }), {} as Schedule);
 
-const newBlock = (): Block => ({ start: "09:00", end: "18:00", modality: "" });
+const newBlock = (): Block => ({ start: "09:00", end: "18:00", modality: "", service_id: "" });
 
 // Trims "HH:MM:SS" → "HH:MM" so HTML time inputs don't reject it.
 const timeToInput = (t: string) => (t.length >= 5 ? t.slice(0, 5) : t);
 
 const overlaps = (a: Block, b: Block) => a.start < b.end && b.start < a.end;
-// Dos bloques solo chocan si comparten modalidad o alguno vale para cualquiera.
-const sameLane = (a: Block, b: Block) => !a.modality || !b.modality || a.modality === b.modality;
+// Dos bloques solo chocan si comparten ámbito (modalidad y servicio) o alguno vale para cualquiera.
+const sameLane = (a: Block, b: Block) =>
+  (!a.modality || !b.modality || a.modality === b.modality) &&
+  (!a.service_id || !b.service_id || a.service_id === b.service_id);
 
 interface Step3Props {
   therapist: Therapist;
@@ -66,13 +80,14 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
   const [noCalendar, setNoCalendar] = useState(false);
   const [blockingCalendars, setBlockingCalendars] = useState<string[]>([]);
   const [offeredModalities, setOfferedModalities] = useState<Modality[]>([]);
+  const [services, setServices] = useState<ServiceOption[]>([]);
 
   useEffect(() => {
     const load = async () => {
       const [schedulesRes, configRes, servicesRes] = await Promise.all([
         supabase
           .from("therapist_schedules")
-          .select("day_of_week, start_time, end_time, modality")
+          .select("day_of_week, start_time, end_time, modality, service_id")
           .eq("therapist_id", therapist.id)
           .order("start_time", { ascending: true }),
         supabase
@@ -82,8 +97,9 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
           .maybeSingle(),
         supabase
           .from("therapist_services")
-          .select("service_variants(modality)")
-          .eq("therapist_id", therapist.id),
+          .select("id, name, active, service_variants(modality)")
+          .eq("therapist_id", therapist.id)
+          .order("sort_order"),
       ]);
 
       if (schedulesRes.error) {
@@ -104,6 +120,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
           start: timeToInput(row.start_time),
           end: timeToInput(row.end_time),
           modality: (MODALITIES.some((m) => m.value === row.modality) ? row.modality : "") as Modality | "",
+          service_id: row.service_id ?? "",
         });
       }
       setSchedule(next);
@@ -122,6 +139,9 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
         }
       }
       setOfferedModalities(MODALITIES.map((m) => m.value).filter((m) => mods.has(m)));
+      setServices(
+        (servicesRes.data ?? []).filter((x) => x.active !== false).map((x) => ({ id: x.id, name: x.name })),
+      );
 
       setLoading(false);
     };
@@ -146,8 +166,19 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
     }));
   };
 
-  // Solo tiene sentido elegir modalidad por bloque cuando se ofrece más de una.
+  // El ámbito por bloque (modalidad o servicio) solo aparece cuando hay entre qué elegir.
   const showModality = offeredModalities.length > 1;
+  const showService = services.length > 1;
+  const showScope = showModality || showService;
+
+  // Un solo selector: "any" | "mod:<modality>" | "svc:<service_id>".
+  const scopeValue = (b: Block) => (b.service_id ? `svc:${b.service_id}` : b.modality ? `mod:${b.modality}` : "any");
+  const scopePatch = (v: string): Partial<Block> =>
+    v.startsWith("svc:")
+      ? { service_id: v.slice(4), modality: "" }
+      : v.startsWith("mod:")
+        ? { modality: v.slice(4) as Modality, service_id: "" }
+        : { modality: "", service_id: "" };
 
   const validationError = (() => {
     if (!noCalendar && !calendarId.trim()) {
@@ -191,7 +222,13 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
         .eq("therapist_id", therapist.id);
       if (configErr) throw configErr;
 
-      const payload: { day_of_week: number; start_time: string; end_time: string; modality: string | null }[] = [];
+      const payload: {
+        day_of_week: number;
+        start_time: string;
+        end_time: string;
+        modality: string | null;
+        service_id: string | null;
+      }[] = [];
       for (const d of DAYS) {
         for (const b of schedule[d.value]) {
           payload.push({
@@ -199,6 +236,7 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
             start_time: b.start,
             end_time: b.end,
             modality: showModality && b.modality ? b.modality : null,
+            service_id: showService && b.service_id ? b.service_id : null,
           });
         }
       }
@@ -269,6 +307,24 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
             </Label>
           </div>
 
+          {!noCalendar && (
+            <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+              <p className="font-medium text-card-foreground">Dale permiso al sistema para escribir en tu calendario</p>
+              <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+                <li>En Google Calendar, abre la configuración del calendario y entra a “Compartir con determinadas personas”.</li>
+                <li>
+                  Agrega{" "}
+                  <code className="rounded bg-muted px-1 text-card-foreground">{CALENDAR_SERVICE_EMAIL}</code>{" "}
+                  con el permiso <span className="font-medium text-card-foreground">“Hacer cambios en eventos”</span>.
+                </li>
+                <li>Haz lo mismo con cada calendario compartido que agregues abajo (ahí basta con “Ver todos los detalles”).</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                Sin este permiso las citas no se pueden crear ni mover en tu calendario. Lo verificamos al activar tu cuenta.
+              </p>
+            </div>
+          )}
+
           <SharedCalendarsFields
             value={blockingCalendars}
             onChange={setBlockingCalendars}
@@ -282,9 +338,10 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
           <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Horarios de atención
           </h3>
-          {showModality && (
+          {showScope && (
             <p className="text-xs text-muted-foreground">
-              Ofreces más de una modalidad: puedes indicar en qué horarios atiendes cada una. “Cualquier modalidad” sirve para ambas.
+              Cada bloque puede valer para todo, solo para una modalidad o solo para un servicio
+              (por ejemplo, “Cierre de cadera solo los viernes”). “Cualquiera” sirve para todo.
             </p>
           )}
           {DAYS.map((d) => {
@@ -325,23 +382,28 @@ const Step3Schedule = ({ therapist, onSaved }: Step3Props) => {
                             onChange={(e) => updateBlock(d.value, idx, { end: e.target.value })}
                             className="w-28"
                           />
-                          {showModality && (
+                          {showScope && (
                             <Select
-                              value={block.modality || "any"}
-                              onValueChange={(v) =>
-                                updateBlock(d.value, idx, { modality: v === "any" ? "" : (v as Modality) })
-                              }
+                              value={scopeValue(block)}
+                              onValueChange={(v) => updateBlock(d.value, idx, scopePatch(v))}
                             >
-                              <SelectTrigger className="w-44" aria-label="Modalidad del bloque">
+                              <SelectTrigger className="w-52" aria-label="Ámbito del bloque">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="any">Cualquier modalidad</SelectItem>
-                                {MODALITIES.filter((m) => offeredModalities.includes(m.value)).map((m) => (
-                                  <SelectItem key={m.value} value={m.value}>
-                                    {m.label}
-                                  </SelectItem>
-                                ))}
+                                <SelectItem value="any">Cualquiera</SelectItem>
+                                {showModality &&
+                                  MODALITIES.filter((m) => offeredModalities.includes(m.value)).map((m) => (
+                                    <SelectItem key={m.value} value={`mod:${m.value}`}>
+                                      Solo {m.label.toLowerCase()}
+                                    </SelectItem>
+                                  ))}
+                                {showService &&
+                                  services.map((sv) => (
+                                    <SelectItem key={sv.id} value={`svc:${sv.id}`}>
+                                      Solo {sv.name}
+                                    </SelectItem>
+                                  ))}
                               </SelectContent>
                             </Select>
                           )}

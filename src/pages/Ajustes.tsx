@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Brain, CalendarCheck, CalendarRange, Globe, Landmark, Loader2, Search, ShieldCheck, Sparkles, UserX, X } from "lucide-react";
+import { Bot, Brain, CalendarCheck, CalendarClock, CalendarRange, Globe, Landmark, Loader2, Search, ShieldCheck, Sparkles, UserX, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserConfig } from "@/hooks/useUserConfig";
@@ -29,6 +29,8 @@ import AssistantSettingsFields, {
   type AssistantSettings,
 } from "@/components/AssistantSettingsFields";
 import SharedCalendarsFields, { normalizeCalendarIds } from "@/components/SharedCalendarsFields";
+import BookingRulesFields from "@/components/BookingRulesFields";
+import { bookingRulesFromJson, bookingRulesToJson, validateBookingRules, type BookingRules } from "@/lib/bookingRules";
 import {
   FIRST_VISIT_RULES_COLUMNS,
   rulesFromRow,
@@ -173,14 +175,14 @@ function BankCard({ therapistId, config }: { therapistId: string; config: Ajuste
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Emi comparte estos datos a tus pacientes cuando piden pagar por transferencia.
+          Se comparten con el consultante cuando pide pagar por transferencia o debe un anticipo.
         </p>
       </CardContent>
     </Card>
   );
 }
 
-// ── Alcance de Emi ────────────────────────────────────────────────────────────
+// ── Alcance del asistente ────────────────────────────────────────────────────────────
 
 function ScopeCard({ therapistId, config }: { therapistId: string; config: AjustesConfig }) {
   const [onlyKnown, setOnlyKnown] = useState(config.only_known_patients ?? false);
@@ -219,7 +221,7 @@ function ScopeCard({ therapistId, config }: { therapistId: string; config: Ajust
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 font-display text-lg">
           <ShieldCheck className="h-5 w-5 text-primary" />
-          Alcance de Emi
+          Alcance del asistente
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -227,7 +229,7 @@ function ScopeCard({ therapistId, config }: { therapistId: string; config: Ajust
           <div>
             <Label className="text-sm font-semibold">Atender solo pacientes registrados</Label>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Los números que no están en tu lista de pacientes no recibirán respuesta de Emi
+              Los números que no están en tu lista de pacientes no recibirán respuesta automática
               (útil si tu línea mezcla vida personal).
             </p>
           </div>
@@ -288,6 +290,52 @@ function PoliciesCard({ therapistId, config }: { therapistId: string; config: Aj
           onChange={handleChange}
           idPrefix="ajustes-policy"
         />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Reglas de agenda (booking_rules) ──────────────────────────────────────────
+
+function BookingRulesCard({ therapistId, config }: { therapistId: string; config: AjustesConfig }) {
+  const queryClient = useQueryClient();
+  const [rules, setRules] = useState<BookingRules>(() => bookingRulesFromJson(config.booking_rules));
+  const [saving, setSaving] = useState(false);
+  const error = validateBookingRules(rules);
+
+  const handleSave = async () => {
+    if (error || saving) return;
+    setSaving(true);
+    const ok = await saveConfig(therapistId, { booking_rules: bookingRulesToJson(rules) });
+    setSaving(false);
+    if (!ok) {
+      toast.error("Error al guardar las reglas de agenda");
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ["ajustes-config"] });
+    toast.success("Reglas de agenda guardadas", { duration: 1500 });
+  };
+
+  return (
+    <Card className="card-shadow">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 font-display text-lg">
+          <CalendarClock className="h-5 w-5 text-primary" />
+          Reglas de agenda
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <p className="text-xs text-muted-foreground">
+          El asistente solo ofrece horarios que cumplan estas reglas. Las primeras consultas pueden tener su propio mínimo (abajo).
+        </p>
+        <BookingRulesFields value={rules} onChange={(patch) => setRules((prev) => ({ ...prev, ...patch }))} idPrefix="aj-br" />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={Boolean(error) || saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -589,7 +637,7 @@ function ExclusionCard() {
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 font-display text-lg">
           <UserX className="h-5 w-5 text-primary" />
-          Pacientes que Emi no atiende
+          Pacientes que solo atiendes tú
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -660,7 +708,7 @@ function ExclusionCard() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No hay pacientes en la lista. Emi atiende a todos tus pacientes.
+            No hay pacientes en la lista. El asistente atiende a todos tus pacientes.
           </p>
         )}
       </CardContent>
@@ -785,6 +833,7 @@ const Ajustes = () => {
         ) : (
           <div className="space-y-5">
             <BankCard therapistId={therapistId} config={ajustes} />
+            <BookingRulesCard therapistId={therapistId} config={ajustes} />
             <FirstVisitCard therapistId={therapistId} config={ajustes} variants={variants ?? []} />
             <AssistantCard
               therapistId={therapistId}

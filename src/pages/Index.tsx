@@ -120,7 +120,7 @@ const Index = () => {
             <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Emergencia
             </h2>
-            <EmergencyProtocol />
+            <EmergencyProtocol config={config} />
           </section>
         </div>
       </main>

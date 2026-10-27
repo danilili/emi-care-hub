@@ -14,12 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ChevronRight, Loader2 } from "lucide-react";
+import BookingRulesFields from "@/components/BookingRulesFields";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+  DEFAULT_BOOKING_RULES,
+  bookingRulesFromJson,
+  bookingRulesToJson,
+  validateBookingRules,
+  type BookingRules,
+} from "@/lib/bookingRules";
 import AppointmentPoliciesFields, {
   normalizePolicies,
   type AppointmentPolicies,
@@ -52,21 +55,6 @@ const TIMEZONES = [
   { value: "America/Cancun", label: "Cancún (Quintana Roo)" },
 ] as const;
 
-const SLOT_OPTIONS = [
-  { value: 60, label: "Solo en punto (cada hora)" },
-  { value: 30, label: "En punto y media (cada 30 min)" },
-] as const;
-
-const DAYS = [
-  { value: 1, label: "Lunes" },
-  { value: 2, label: "Martes" },
-  { value: 3, label: "Miércoles" },
-  { value: 4, label: "Jueves" },
-  { value: 5, label: "Viernes" },
-  { value: 6, label: "Sábado" },
-  { value: 0, label: "Domingo" },
-] as const;
-
 interface Step4Props {
   therapist: Therapist;
   onSaved: () => void;
@@ -76,7 +64,6 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [timezone, setTimezone] = useState("America/Mexico_City");
   const [officeAddress, setOfficeAddress] = useState("");
@@ -89,12 +76,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
   const [assistant, setAssistant] = useState<AssistantSettings>(() => assistantSettingsFromRow(null));
   const [previewVariants, setPreviewVariants] = useState<PreviewVariant[]>([]);
 
-  const [slotMinutes, setSlotMinutes] = useState<number>(60);
-  const [minHoursAdvance, setMinHoursAdvance] = useState(4);
-  const [maxDaysAdvance, setMaxDaysAdvance] = useState(60);
-  const [noBookingSameDayAfter, setNoBookingSameDayAfter] = useState("");
-  const [blockNextDayDow, setBlockNextDayDow] = useState<number | null>(null);
-  const [blockNextDayTime, setBlockNextDayTime] = useState("");
+  const [bookingRules, setBookingRules] = useState<BookingRules>(DEFAULT_BOOKING_RULES);
 
   const [hasInPerson, setHasInPerson] = useState(false);
   const [hasVirtual, setHasVirtual] = useState(false);
@@ -138,20 +120,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
         setFirstVisit(rulesFromRow(cfg as unknown as Record<string, unknown>));
         setAssistant(assistantSettingsFromRow(cfg as unknown as Record<string, unknown>));
 
-        const rules = (cfg.booking_rules as Record<string, any> | null) ?? {};
-        if (typeof rules.slot_minutes === "number") setSlotMinutes(rules.slot_minutes);
-        if (typeof rules.min_hours_advance === "number") setMinHoursAdvance(rules.min_hours_advance);
-        if (typeof rules.max_days_advance === "number") setMaxDaysAdvance(rules.max_days_advance);
-        if (typeof rules.no_booking_same_day_after === "string") {
-          setNoBookingSameDayAfter(rules.no_booking_same_day_after.slice(0, 5));
-        }
-        if (rules.block_next_day_from && typeof rules.block_next_day_from === "object") {
-          const b = rules.block_next_day_from;
-          if (typeof b.day_of_week === "number") setBlockNextDayDow(b.day_of_week);
-          if (typeof b.after_time === "string") setBlockNextDayTime(b.after_time.slice(0, 5));
-          if (b.day_of_week !== undefined || b.after_time) setAdvancedOpen(true);
-        }
-        if (rules.no_booking_same_day_after) setAdvancedOpen(true);
+        setBookingRules(bookingRulesFromJson(cfg.booking_rules));
       }
 
       const modalities = new Set<string>();
@@ -191,11 +160,8 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
         return "La liga de videollamada debe empezar con http:// o https://";
     }
     if (!cancellationPolicy.trim()) return "La política de cancelación no puede estar vacía.";
-    if (minHoursAdvance < 0) return "El mínimo de horas de anticipación no puede ser negativo.";
-    if (maxDaysAdvance < 1) return "El máximo de días debe ser al menos 1.";
-    if ((blockNextDayDow !== null) !== Boolean(blockNextDayTime)) {
-      return "Para bloquear el día siguiente, completa día y hora (o limpia ambos).";
-    }
+    const br = validateBookingRules(bookingRules);
+    if (br) return br;
     const fv = validateFirstVisitRules(firstVisit);
     if (fv) return fv;
     const as = validateAssistantSettings(assistant, {
@@ -213,21 +179,6 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
 
     setSaving(true);
     try {
-      const bookingRules: Record<string, unknown> = {
-        slot_minutes: slotMinutes,
-        min_hours_advance: minHoursAdvance,
-        max_days_advance: maxDaysAdvance,
-      };
-      if (noBookingSameDayAfter) {
-        bookingRules.no_booking_same_day_after = noBookingSameDayAfter;
-      }
-      if (blockNextDayDow !== null && blockNextDayTime) {
-        bookingRules.block_next_day_from = {
-          day_of_week: blockNextDayDow,
-          after_time: blockNextDayTime,
-        };
-      }
-
       const { error } = await supabase
         .from("therapist_config")
         .update({
@@ -235,7 +186,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
           office_address: officeAddress.trim() || null,
           virtual_meeting_url: virtualMeetingUrl.trim() || null,
           cancellation_policy: cancellationPolicy.trim(),
-          booking_rules: bookingRules as Json,
+          booking_rules: bookingRulesToJson(bookingRules),
           appointment_policies: appointmentPolicies as unknown as Json,
           ...rulesToPatch(firstVisit),
           ...assistantSettingsToPatch(assistant),
@@ -309,7 +260,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
                   onChange={(e) => setOfficeAddress(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Emi se la dará a tus pacientes cuando agenden una sesión {hasInPerson && hasHomeVisit ? "presencial o a domicilio" : hasInPerson ? "presencial" : "a domicilio"}.
+                  Se comparte con el consultante al agendar una sesión {hasInPerson && hasHomeVisit ? "presencial o a domicilio" : hasInPerson ? "presencial" : "a domicilio"}.
                 </p>
               </div>
             )}
@@ -324,7 +275,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
                   onChange={(e) => setVirtualMeetingUrl(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Liga única y permanente (Zoom personal, Google Meet, etc.). Emi se la dará a tus pacientes cuando agenden una sesión virtual.
+                  Liga única y permanente (Zoom personal, Google Meet, etc.). Se comparte con el consultante al agendar una sesión en línea.
                 </p>
               </div>
             )}
@@ -338,126 +289,11 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
             Reglas de agenda
           </h3>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="slot_minutes">Horas de inicio para los pacientes *</Label>
-            <Select
-              value={String(slotMinutes)}
-              onValueChange={(v) => setSlotMinutes(parseInt(v, 10))}
-            >
-              <SelectTrigger id="slot_minutes">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SLOT_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={String(o.value)}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Define cada cuánto puede empezar una sesión. Por ejemplo: solo a las 9:00, 10:00, 11:00… o también 9:30, 10:30.
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="min_hours">Anticipación mínima (horas)</Label>
-              <Input
-                id="min_hours"
-                type="number"
-                min={0}
-                value={minHoursAdvance}
-                onChange={(e) => setMinHoursAdvance(parseInt(e.target.value, 10) || 0)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Cuántas horas antes de la sesión es lo más cerca que se puede agendar.
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="max_days">Máximo a futuro (días)</Label>
-              <Input
-                id="max_days"
-                type="number"
-                min={1}
-                value={maxDaysAdvance}
-                onChange={(e) => setMaxDaysAdvance(parseInt(e.target.value, 10) || 1)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Hasta cuántos días en el futuro se puede agendar.
-              </p>
-            </div>
-          </div>
-
-          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform ${advancedOpen ? "" : "-rotate-90"}`} />
-                Reglas avanzadas
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-3">
-              <p className="text-xs text-muted-foreground">
-                Opcionales. Si dejas un campo vacío, esa regla no se aplica.
-              </p>
-
-              <div className="space-y-1.5 rounded-lg border border-border bg-background/50 p-3">
-                <Label htmlFor="no_same_day">No aceptar citas para hoy después de las…</Label>
-                <Input
-                  id="no_same_day"
-                  type="time"
-                  value={noBookingSameDayAfter}
-                  onChange={(e) => setNoBookingSameDayAfter(e.target.value)}
-                  className="w-32"
-                />
-              </div>
-
-              <div className="space-y-1.5 rounded-lg border border-border bg-background/50 p-3">
-                <Label>No aceptar citas para mañana si hoy es…</Label>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={blockNextDayDow !== null ? String(blockNextDayDow) : ""}
-                    onValueChange={(v) => setBlockNextDayDow(v === "" ? null : parseInt(v, 10))}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Día…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAYS.map((d) => (
-                        <SelectItem key={d.value} value={String(d.value)}>
-                          {d.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <span className="text-sm text-muted-foreground">y ya pasaron las</span>
-                  <Input
-                    type="time"
-                    value={blockNextDayTime}
-                    onChange={(e) => setBlockNextDayTime(e.target.value)}
-                    className="w-32"
-                  />
-                  {(blockNextDayDow !== null || blockNextDayTime) && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setBlockNextDayDow(null);
-                        setBlockNextDayTime("");
-                      }}
-                      className="text-muted-foreground"
-                    >
-                      Limpiar
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+          <BookingRulesFields
+            value={bookingRules}
+            onChange={(patch) => setBookingRules((prev) => ({ ...prev, ...patch }))}
+            idPrefix="ob-br"
+          />
         </CardContent>
       </Card>
 
@@ -504,7 +340,7 @@ const Step4BotConfig = ({ therapist, onSaved }: Step4Props) => {
             value={firstVisit}
             onChange={(patch) => setFirstVisit((prev) => ({ ...prev, ...patch }))}
             variants={previewVariants}
-            bookingMinHours={minHoursAdvance}
+            bookingMinHours={bookingRules.min_hours_advance}
             idPrefix="ob-fvr"
           />
         </CardContent>

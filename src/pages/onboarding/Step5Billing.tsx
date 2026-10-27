@@ -49,7 +49,7 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
   const [payments, setPayments] = useState<PaymentDraft[]>([]);
   const [wantsFiscal, setWantsFiscal] = useState(false);
   const [fiscalUploaded, setFiscalUploaded] = useState(false);
-  // Cuenta bancaria (columnas nuevas de therapist_config; Emi la comparte para transferencias)
+  // Cuenta bancaria (therapist_config; se comparte al consultante para transferencias)
   const [bankName, setBankName] = useState("");
   const [bankClabe, setBankClabe] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
@@ -304,7 +304,7 @@ const Step5Billing = ({ therapist, onSaved }: Step5Props) => {
               Cuenta bancaria
             </h3>
             <p className="text-xs text-muted-foreground">
-              Emi comparte estos datos a tus pacientes cuando piden pagar por transferencia.
+              Se comparten con el consultante cuando pide pagar por transferencia o debe un anticipo.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

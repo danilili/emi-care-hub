@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Permisos que controlan qué puede resolver Emi sola cuando un paciente pide
+// Permisos que controlan qué se resuelve en automático cuando un paciente pide
 // cambiar la modalidad de su cita o que otra persona la tome.
 // Se guarda en therapist_config.appointment_policies (jsonb). Llave ausente = "ask_therapist".
 
@@ -25,18 +25,18 @@ export const POLICY_FIELDS: { key: PolicyKey; label: string }[] = [
 ];
 
 export const POLICY_OPTIONS: { value: PolicyValue; label: string }[] = [
-  { value: "allowed", label: "Sí, Emi lo resuelve" },
+  { value: "allowed", label: "Sí, se resuelve en automático" },
   { value: "ask_therapist", label: "Consultarme primero" },
   { value: "not_allowed", label: "No se permite" },
 ];
 
 export const POLICY_VALUE_LABEL: Record<PolicyValue, string> = {
-  allowed: "Sí, Emi lo resuelve",
+  allowed: "Sí, se resuelve en automático",
   ask_therapist: "Consultarme primero",
   not_allowed: "No se permite",
 };
 
-export const POLICIES_HELP = "Si algo no está configurado, Emi te lo consulta; nunca inventa una regla.";
+export const POLICIES_HELP = "Si algo no está configurado, se te consulta a ti; el asistente nunca inventa una regla.";
 
 const VALID_VALUES = new Set<string>(POLICY_OPTIONS.map((o) => o.value));
 

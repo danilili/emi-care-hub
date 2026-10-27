@@ -171,7 +171,7 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="tone">Tono del asistente</Label>
+            <Label htmlFor="tone">Tono del consultorio</Label>
             <Input
               id="tone"
               value={tone}
@@ -179,7 +179,7 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
               placeholder="cercano y profesional"
             />
             <p className="text-xs text-muted-foreground">
-              Cómo quieres que Emi se dirija a tus pacientes.
+              Cómo habla tu consultorio por WhatsApp. Los mensajes automáticos no tienen nombre ni personaje: usan la voz del consultorio con este tono.
             </p>
           </div>
 
@@ -190,7 +190,7 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
               rows={4}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Una breve presentación profesional. Emi puede compartirla cuando un paciente pregunte por ti."
+              placeholder="Una breve presentación profesional. Se comparte cuando un consultante pregunta por ti."
             />
           </div>
 
@@ -204,7 +204,7 @@ const Step1Identity = ({ therapist, onSaved }: Step1Props) => {
               placeholder="55 1234 5678"
             />
             <p className="text-xs text-muted-foreground">
-              Para que el equipo de Emi se comunique contigo. No es el número que usará el bot con tus pacientes.
+              Para que el equipo de soporte se comunique contigo. No es el número que atiende a tus consultantes.
             </p>
           </div>
 

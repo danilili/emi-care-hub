@@ -10,17 +10,17 @@ const DOCUMENT_SLOTS = [
   {
     type: "privacy_policy",
     title: "Aviso de privacidad",
-    helper: "Tu aviso de privacidad para que Emi lo comparta con los pacientes al primer contacto.",
+    helper: "Se comparte con el consultante al primer contacto.",
   },
   {
     type: "cv",
     title: "Currículum",
-    helper: "Tu CV. Emi puede usarlo para describir tu trayectoria profesional cuando un paciente pregunte.",
+    helper: "Tu CV. Sirve para describir tu trayectoria cuando un consultante pregunta.",
   },
   {
     type: "professional_license",
     title: "Cédula profesional",
-    helper: "Imagen o PDF de tu cédula. Emi puede compartirla si un paciente pide validar tu profesión.",
+    helper: "Imagen o PDF de tu cédula. Se comparte si un consultante pide validar tu profesión.",
   },
   {
     type: "consent_form",

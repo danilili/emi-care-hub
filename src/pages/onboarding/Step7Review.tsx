@@ -22,6 +22,7 @@ import {
   type FirstVisitRules,
 } from "@/lib/firstVisitRules";
 import { modalityLabel } from "@/lib/modalities";
+import { PATIENT_IMPORT_LABEL, type PatientImportMode } from "./Step6Patients";
 
 type Therapist = Tables<"therapists">;
 
@@ -54,6 +55,7 @@ interface ConfigSummary {
   timezone: string;
   slot_minutes: number | null;
   min_hours_advance: number | null;
+  min_hours_business_only: boolean;
   max_days_advance: number | null;
   payment_count: number;
   has_fiscal: boolean;
@@ -62,6 +64,7 @@ interface ConfigSummary {
   blocking_calendars: string[];
   first_visit: FirstVisitRules;
   assistant: AssistantSettings;
+  patient_import_mode: PatientImportMode;
 }
 
 interface Step7Props {
@@ -159,6 +162,7 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
         timezone: cfg?.timezone ?? "America/Mexico_City",
         slot_minutes: typeof rules.slot_minutes === "number" ? rules.slot_minutes : null,
         min_hours_advance: typeof rules.min_hours_advance === "number" ? rules.min_hours_advance : null,
+        min_hours_business_only: rules.min_hours_business_only === true,
         max_days_advance: typeof rules.max_days_advance === "number" ? rules.max_days_advance : null,
         payment_count: payments.length,
         has_fiscal: (docsRes.data ?? []).some((d) => d.document_type === "fiscal_certificate"),
@@ -167,6 +171,7 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
         blocking_calendars: Array.isArray(cfg?.availability_calendar_ids) ? cfg.availability_calendar_ids : [],
         first_visit: rulesFromRow(cfg as unknown as Record<string, unknown>),
         assistant: assistantSettingsFromRow(cfg as unknown as Record<string, unknown>),
+        patient_import_mode: (cfg?.patient_import_mode ?? "none") as PatientImportMode,
       });
 
       setDocuments(
@@ -309,7 +314,9 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
               </li>
             )}
             {config.min_hours_advance !== null && (
-              <li>Antelación mínima: {config.min_hours_advance} h</li>
+              <li>
+                Antelación mínima: {config.min_hours_advance} h{config.min_hours_business_only ? " hábiles" : ""}
+              </li>
             )}
             {config.max_days_advance !== null && (
               <li>Máximo a futuro: {config.max_days_advance} días</li>
@@ -380,6 +387,12 @@ const Step7Review = ({ therapist, goToStep }: Step7Props) => {
               <li key={i}>• {DOC_LABEL[t] ?? t}</li>
             ))}
           </ul>
+        )}
+      </SummarySection>
+
+      <SummarySection title="Pacientes actuales" onEdit={() => goToStep(6)}>
+        {config && (
+          <p className="text-sm text-muted-foreground">{PATIENT_IMPORT_LABEL[config.patient_import_mode]}</p>
         )}
       </SummarySection>
 
